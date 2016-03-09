@@ -213,7 +213,7 @@ function VMEM_Set
 		Write-Host "removing old pagefile"
 		wmic pagefileset delete
 		write-host "creating new pagefile on C:\"
-		wmic pagefileset create name=gc:\pagefile.sysh
+		wmic pagefileset create name=â€œc:\pagefile.sysâ€
 		write-host "set size"
 		$PageFile = Get-WmiObject -Class Win32_PageFileSetting
 		$PageFile.InitialSize = $RAM+257
@@ -229,7 +229,7 @@ function VMEM_Set
 
 function RDP_Port
 {
-### RDP‚Ì‘Ò‚¿Žó‚¯ƒ|[ƒg‚ð•ÏX‚·‚éB
+### RDPã®å¾…ã¡å—ã‘ãƒãƒ¼ãƒˆã‚’å¤‰æ›´ã™ã‚‹ã€‚
 	process
 	{
 		Set-ItemProperty 'registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp -Name 'PortNumber' -Value '33389'
@@ -238,7 +238,7 @@ function RDP_Port
 
 function disable-windowsupdate
 {
-### WindowsUpdate ‚ð–³Œø‰»‚·‚é
+### WindowsUpdate ã‚’ç„¡åŠ¹åŒ–ã™ã‚‹
 	$AutoUpdate = new-object -ComObject "Microsoft.Update.AutoUpdate"
 	$AutoUpdate.Settings.NotificationLevel = 1
 }
@@ -251,33 +251,30 @@ function startup-delay-time-set
 #	$computer.put() 
 }
 
-function set-windows-error-report-option
-{
-### Windows ƒGƒ‰[ƒŠƒ|[ƒg‚ð–³Œø‰»‚·‚éB
+function set-windows-error-report-option {
+### Windows ã‚¨ãƒ©ãƒ¼ãƒªãƒãƒ¼ãƒˆã‚’ç„¡åŠ¹åŒ–ã™ã‚‹ã€‚
 	c:\windows\system32\serverweroption /disable
 }
 
-function get-windows-error-report-option
-{
-### Windows ƒGƒ‰[ƒŠƒ|[ƒg‚ð–³Œø‰»‚·‚éB
-	c:\windows\system32\serverweroption /query
+function get-windows-error-report-option {
+### Windows ã‚¨ãƒ©ãƒ¼ãƒªãƒãƒ¼ãƒˆã‚’ç„¡åŠ¹åŒ–ã™ã‚‹ã€‚
+	$SWO=c:\windows\system32\serverweroption /query |Select -first 3 |select -last 1
+	Write-Host `t`t`tWindowsã‚¨ãƒ©ãƒ¼å ±å‘Š`t`t`t`t$SWO
 }
 
-Function set-ceip-option
-{
-### ƒJƒXƒ^ƒ}[ƒGƒNƒXƒyƒŠƒGƒ“ƒX‚ð–³Œø‰»‚·‚éB
+Function set-ceip-option {
+### ã‚«ã‚¹ã‚¿ãƒžãƒ¼ã‚¨ã‚¯ã‚¹ãƒšãƒªã‚¨ãƒ³ã‚¹ã‚’ç„¡åŠ¹åŒ–ã™ã‚‹ã€‚
 	c:\windows\system32\serverceipoption /disable
 }
 
-Function Get-ceip-option
-{
-### ƒJƒXƒ^ƒ}[ƒGƒNƒXƒyƒŠƒGƒ“ƒX‚ð–³Œø‰»‚·‚éB
-	c:\windows\system32\serverceipoption /query
+Function Get-ceip-option {
+### ã‚«ã‚¹ã‚¿ãƒžãƒ¼ã‚¨ã‚¯ã‚¹ãƒšãƒªã‚¨ãƒ³ã‚¹ã‚’ç¢ºèªã™ã‚‹ã€‚
+	$SCO=c:\windows\system32\serverceipoption /query |Select -first 3 | Select -last 1
 }
 
 Function set-eventlog-size
 {
-### ƒCƒxƒ“ƒgƒƒOƒTƒCƒY‚ð•ÏX‚·‚é
+### ã‚¤ãƒ™ãƒ³ãƒˆãƒ­ã‚°ã‚µã‚¤ã‚ºã‚’å¤‰æ›´ã™ã‚‹
 	limit-eventlog -logname Application -maximumsize 256mb -overflowaction donotoverwrite
 }
 
@@ -304,11 +301,22 @@ Function add-windowsfeature-option
 ### ADD-WindowsFeature Web-CGI
 }
 
+Function Get-ProgramList {
+	$PL_PATH=SoftwareÂ¥MicrosoftÂ¥WindowsÂ¥CurrentÂ¥VersionÂ¥Uninstall"
+	$PATH1="HKLM"+$PL_PATH
+	$PATH2="HKCU"+$PL_PATH
+	Get-ChildItem -Path ($PATH1,$PATH2) | 
+	    %(Get-Item-Property $_.PSPath) |
+	    ?($_.systemcomponent -ne 1 -and $_.parentkeyname -eq $null) |
+	    Sort DisplayName |
+	    Select DisplayName,Publisher 
+	  
+}
 
 
 function powercfg-set
 {
-	$PGUID = powercfg /L|findstr "‚ƒpƒtƒH[ƒ}ƒ“ƒX" | % {$_.Split(" ")[2]}
+	$PGUID = powercfg /L|findstr "é«˜ãƒ‘ãƒ•ã‚©ãƒ¼ãƒžãƒ³ã‚¹" | % {$_.Split(" ")[2]}
 	powercfg /S $PGUID
 }
 
@@ -341,32 +349,32 @@ function Get-Service_list
    Get-WindowsFeature |select-object { $_.depth,$_.displayname,$_.installstate }
 }
 
-## ƒtƒHƒ‹ƒ_ƒIƒvƒVƒ‡ƒ“(Šg’£Žq‚ð•\Ž¦‚·‚é)
+## ãƒ•ã‚©ãƒ«ãƒ€ã‚ªãƒ—ã‚·ãƒ§ãƒ³(æ‹¡å¼µå­ã‚’è¡¨ç¤ºã™ã‚‹)
 Set-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "HideFileExt" -Value 0
  
-## ƒtƒHƒ‹ƒ_ƒIƒvƒVƒ‡ƒ“(‰B‚µƒtƒ@ƒCƒ‹A‰B‚µƒtƒHƒ‹ƒ_A‰B‚µƒhƒ‰ƒCƒu‚ð•\Ž¦‚·‚é)
+## ãƒ•ã‚©ãƒ«ãƒ€ã‚ªãƒ—ã‚·ãƒ§ãƒ³(éš ã—ãƒ•ã‚¡ã‚¤ãƒ«ã€éš ã—ãƒ•ã‚©ãƒ«ãƒ€ã€éš ã—ãƒ‰ãƒ©ã‚¤ãƒ–ã‚’è¡¨ç¤ºã™ã‚‹)
 Set-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -name "Hidden" -Value 1
  
 
 
 -----------------------
 registryPath	Item	Value	Comment
-'registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server'	'fDenyTSConnection'	1	'ƒŠƒ‚[ƒgƒfƒXƒNƒgƒbƒv‚ðŽÀs‚µ‚Ä‚¢‚éƒRƒ“ƒsƒ…[ƒ^‚©‚ç‚ÌÚ‘±‚ð‹–‰Â‚·‚é'
-'registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'	'PortNumber'	'33389'	'RDPÚ‘±ƒ|[ƒg•ÏX(tcp/33389)'
-'registry::HKEY_CURRENT_USERS\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'	'HideFileExt'	0	'ƒtƒHƒ‹ƒ_ƒIƒvƒVƒ‡ƒ“(Šg’£Žq‚ð•\Ž¦‚·‚é)'
-'registry::HKEY_CURRENT_USERS\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'	'Hidden'	1	'ƒtƒHƒ‹ƒ_ƒIƒvƒVƒ‡ƒ“(‰B‚µƒtƒ@ƒCƒ‹A‰B‚µƒtƒHƒ‹ƒ_A‰B‚µƒhƒ‰ƒCƒu‚ð•\Ž¦‚·‚é)'
-'registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'	'dontdisplaylastusername'	1	'ƒ[ƒJƒ‹ƒZƒLƒ…ƒŠƒeƒBƒ|ƒŠƒV[:‘Î˜bŒ^ƒƒOƒIƒ“FÅŒã‚Ìƒ†[ƒU[–¼‚ð•\Ž¦‚µ‚È‚¢'
+'registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server'	'fDenyTSConnection'	1	'ãƒªãƒ¢ãƒ¼ãƒˆãƒ‡ã‚¹ã‚¯ãƒˆãƒƒãƒ—ã‚’å®Ÿè¡Œã—ã¦ã„ã‚‹ã‚³ãƒ³ãƒ”ãƒ¥ãƒ¼ã‚¿ã‹ã‚‰ã®æŽ¥ç¶šã‚’è¨±å¯ã™ã‚‹'
+'registry::HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'	'PortNumber'	'33389'	'RDPæŽ¥ç¶šãƒãƒ¼ãƒˆå¤‰æ›´(tcp/33389)'
+'registry::HKEY_CURRENT_USERS\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'	'HideFileExt'	0	'ãƒ•ã‚©ãƒ«ãƒ€ã‚ªãƒ—ã‚·ãƒ§ãƒ³(æ‹¡å¼µå­ã‚’è¡¨ç¤ºã™ã‚‹)'
+'registry::HKEY_CURRENT_USERS\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'	'Hidden'	1	'ãƒ•ã‚©ãƒ«ãƒ€ã‚ªãƒ—ã‚·ãƒ§ãƒ³(éš ã—ãƒ•ã‚¡ã‚¤ãƒ«ã€éš ã—ãƒ•ã‚©ãƒ«ãƒ€ã€éš ã—ãƒ‰ãƒ©ã‚¤ãƒ–ã‚’è¡¨ç¤ºã™ã‚‹)'
+'registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'	'dontdisplaylastusername'	1	'ãƒ­ãƒ¼ã‚«ãƒ«ã‚»ã‚­ãƒ¥ãƒªãƒ†ã‚£ãƒãƒªã‚·ãƒ¼:å¯¾è©±åž‹ãƒ­ã‚°ã‚ªãƒ³ï¼šæœ€å¾Œã®ãƒ¦ãƒ¼ã‚¶ãƒ¼åã‚’è¡¨ç¤ºã—ãªã„'
 -----------------------
 FW_Rule
 
-ƒCƒxƒ“ƒgƒƒOƒTƒCƒY•ÏX
+ã‚¤ãƒ™ãƒ³ãƒˆãƒ­ã‚°ã‚µã‚¤ã‚ºå¤‰æ›´
 limit-eventlog 
---“dŒ¹Ý’è
-powercfg -L |grep (‚ƒpƒtƒH[ƒ}ƒ“ƒX)| cut -f 3 |powercfg -setactive 
+--é›»æºè¨­å®š
+powercfg -L |grep (é«˜ãƒ‘ãƒ•ã‚©ãƒ¼ãƒžãƒ³ã‚¹)| cut -f 3 |powercfg -setactive 
 
 
 
-ƒƒ‚ƒŠƒ_ƒ“ƒv‚É‚Â‚¢‚Ä
+ãƒ¡ãƒ¢ãƒªãƒ€ãƒ³ãƒ—ã«ã¤ã„ã¦
 
 http://jp.fujitsu.com/platform/server/primergy/technical/construct/pdf/win2008-memory-dump.pdf
 
@@ -374,164 +382,164 @@ http://jp.fujitsu.com/platform/server/primergy/technical/construct/pdf/win2008-m
 
 -------------------------
 
-EEE Windows 2012 R2 ƒeƒ“ƒvƒŒ[ƒg
+EEE Windows 2012 R2 ãƒ†ãƒ³ãƒ—ãƒ¬ãƒ¼ãƒˆ
 
 
-¡ŽQlURL
-ƒx[ƒXƒT[ƒo OSŽd—l > Windows Server 2012 R2 for V ƒVƒŠ[ƒY G2 
+â– å‚è€ƒURL
+ãƒ™ãƒ¼ã‚¹ã‚µãƒ¼ãƒ OSä»•æ§˜ > Windows Server 2012 R2 for V ã‚·ãƒªãƒ¼ã‚º G2 
 https://cf.iij-group.jp/pages/viewpage.action?pageId=53725727
 
-EOS
-Windows Server 2012 R2 Standard •]‰¿”Å
+ãƒ»OS
+Windows Server 2012 R2 Standard è©•ä¾¡ç‰ˆ
 
-ECPU 1
-Eƒƒ‚ƒŠ 4GB
+ãƒ»CPU 1
+ãƒ»ãƒ¡ãƒ¢ãƒª 4GB
 
-EƒRƒ“ƒsƒ…[ƒ^–¼
-WIN-5SU65JSB77IiƒfƒtƒHƒ‹ƒgj
+ãƒ»ã‚³ãƒ³ãƒ”ãƒ¥ãƒ¼ã‚¿å
+WIN-5SU65JSB77Iï¼ˆãƒ‡ãƒ•ã‚©ãƒ«ãƒˆï¼‰
 
-Eƒ[ƒNƒOƒ‹[ƒv
+ãƒ»ãƒ¯ãƒ¼ã‚¯ã‚°ãƒ«ãƒ¼ãƒ—
 WORKGROUP
 
-Eƒ†[ƒUƒAƒJƒEƒ“ƒg
+ãƒ»ãƒ¦ãƒ¼ã‚¶ã‚¢ã‚«ã‚¦ãƒ³ãƒˆ
 administrator
 eee********
 
-EƒpƒXƒ[ƒh
-–³ŠúŒÀ
+ãƒ»ãƒ‘ã‚¹ãƒ¯ãƒ¼ãƒ‰
+ç„¡æœŸé™
 
-xEWindowsƒGƒ‰[•ñ
-ƒRƒ“ƒgƒ[ƒ‹ƒpƒlƒ‹ > ƒAƒNƒVƒ‡ƒ“ƒZƒ“ƒ^[ > ƒƒ“ƒeƒiƒ“ƒX > –â‘èƒŒƒ|[ƒg‚Ì‰ðŒˆô‚ðŠm”F > Ý’è
- ¨ ƒŒƒ|[ƒg‚ð‘—M‚¹‚¸A‚±‚ÌŠm”F‰æ–Ê‚à¡Œã•\Ž¦‚µ‚Ü‚¹‚ñ
+xãƒ»Windowsã‚¨ãƒ©ãƒ¼å ±å‘Š
+ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ«ãƒ‘ãƒãƒ« > ã‚¢ã‚¯ã‚·ãƒ§ãƒ³ã‚»ãƒ³ã‚¿ãƒ¼ > ãƒ¡ãƒ³ãƒ†ãƒŠãƒ³ã‚¹ > å•é¡Œãƒ¬ãƒãƒ¼ãƒˆã®è§£æ±ºç­–ã‚’ç¢ºèª > è¨­å®š
+ â†’ ãƒ¬ãƒãƒ¼ãƒˆã‚’é€ä¿¡ã›ãšã€ã“ã®ç¢ºèªç”»é¢ã‚‚ä»Šå¾Œè¡¨ç¤ºã—ã¾ã›ã‚“
 https://121ware.com/qasearch/1007/app/servlet/relatedqa?QID=015804
 
-xEƒJƒXƒ^ƒ}ƒGƒNƒXƒyƒŠƒGƒ“ƒXŒüãƒvƒƒOƒ‰ƒ€
-ƒRƒ“ƒgƒ[ƒ‹ƒpƒlƒ‹ > ƒAƒNƒVƒ‡ƒ“ƒZƒ“ƒ^[ > ƒAƒNƒVƒ‡ƒ“ ƒZƒ“ƒ^[‚ÌÝ’è‚ð•ÏX > ƒJƒXƒ^ƒ}ƒGƒNƒXƒyƒŠƒGƒ“ƒXŒüãƒvƒƒOƒ‰ƒ€‚ÌÝ’è‚¢‚¢‚¦AŽQ‰Á‚µ‚Ü‚¹‚ñiƒfƒtƒHƒ‹ƒgj
+xãƒ»ã‚«ã‚¹ã‚¿ãƒžã‚¨ã‚¯ã‚¹ãƒšãƒªã‚¨ãƒ³ã‚¹å‘ä¸Šãƒ—ãƒ­ã‚°ãƒ©ãƒ 
+ã‚³ãƒ³ãƒˆãƒ­ãƒ¼ãƒ«ãƒ‘ãƒãƒ« > ã‚¢ã‚¯ã‚·ãƒ§ãƒ³ã‚»ãƒ³ã‚¿ãƒ¼ > ã‚¢ã‚¯ã‚·ãƒ§ãƒ³ ã‚»ãƒ³ã‚¿ãƒ¼ã®è¨­å®šã‚’å¤‰æ›´ > ã‚«ã‚¹ã‚¿ãƒžã‚¨ã‚¯ã‚¹ãƒšãƒªã‚¨ãƒ³ã‚¹å‘ä¸Šãƒ—ãƒ­ã‚°ãƒ©ãƒ ã®è¨­å®šã„ã„ãˆã€å‚åŠ ã—ã¾ã›ã‚“ï¼ˆãƒ‡ãƒ•ã‚©ãƒ«ãƒˆï¼‰
 http://utaukitune.ldblog.jp/archives/65870405.html
 
-xE‹@”\‚Ì’Ç‰Á
-Windows Server ƒoƒbƒNƒAƒbƒv
- ¨ ƒCƒ“ƒXƒg[ƒ‹‚µ‚Ä‚¢‚È‚¢B(ƒfƒtƒHƒ‹ƒg)
+xãƒ»æ©Ÿèƒ½ã®è¿½åŠ 
+Windows Server ãƒãƒƒã‚¯ã‚¢ãƒƒãƒ—
+ â†’ ã‚¤ãƒ³ã‚¹ãƒˆãƒ¼ãƒ«ã—ã¦ã„ãªã„ã€‚(ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆ)
 
-xyƒT[ƒoƒVƒXƒeƒ€zuÚ×Ý’èv
-ƒpƒtƒH[ƒ}ƒ“ƒX > Ú×Ý’è > ‰¼‘zƒƒ‚ƒŠ
-‘S‚Ä‚Ìƒhƒ‰ƒCƒu‚Ìƒy[ƒWƒ“ƒOƒtƒ@ƒCƒ‹‚ÌƒTƒCƒY‚ðŽ©“®“I‚ÉŠÇ—‚·‚éB
+xã€ã‚µãƒ¼ãƒã‚·ã‚¹ãƒ†ãƒ ã€‘ã€Œè©³ç´°è¨­å®šã€
+ãƒ‘ãƒ•ã‚©ãƒ¼ãƒžãƒ³ã‚¹ > è©³ç´°è¨­å®š > ä»®æƒ³ãƒ¡ãƒ¢ãƒª
+å…¨ã¦ã®ãƒ‰ãƒ©ã‚¤ãƒ–ã®ãƒšãƒ¼ã‚¸ãƒ³ã‚°ãƒ•ã‚¡ã‚¤ãƒ«ã®ã‚µã‚¤ã‚ºã‚’è‡ªå‹•çš„ã«ç®¡ç†ã™ã‚‹ã€‚
 
-xE‹N“®‚Æ‰ñ•œ
-ƒIƒyƒŒ[ƒeƒBƒ“ƒOƒVƒXƒeƒ€‚Ìˆê——‚ð•\Ž¦‚·‚éŽžŠÔ:
-30s ¨ 5s
+xãƒ»èµ·å‹•ã¨å›žå¾©
+ã‚ªãƒšãƒ¬ãƒ¼ãƒ†ã‚£ãƒ³ã‚°ã‚·ã‚¹ãƒ†ãƒ ã®ä¸€è¦§ã‚’è¡¨ç¤ºã™ã‚‹æ™‚é–“:
+30s â†’ 5s
 
-xEƒŠƒ‚[ƒgƒfƒXƒNƒgƒbƒv
-ƒVƒXƒeƒ€‚ÌƒvƒƒpƒeƒB > ƒŠƒ‚[ƒgƒ^ƒu
-ƒŠƒ‚[ƒg ƒfƒXƒNƒgƒbƒv‚ðŽÀs‚µ‚Ä‚¢‚éƒRƒ“ƒsƒ…[ƒ^‚©‚ç‚ÌÚ‘±‚ð‹–‰Â‚·‚é› ¨ œ
-ƒlƒbƒgƒ[ƒNƒŒƒxƒ‹”FØ‚ÅƒŠƒ‚[ƒg ƒfƒXƒNƒgƒbƒv‚ðŽÀs‚µ‚Ä‚¢‚éƒRƒ“ƒsƒ…[ƒ^‚©‚ç‚ÌÚ‘±‚ð‹–‰Â‚·‚é¡ ¨  
+xãƒ»ãƒªãƒ¢ãƒ¼ãƒˆãƒ‡ã‚¹ã‚¯ãƒˆãƒƒãƒ—
+ã‚·ã‚¹ãƒ†ãƒ ã®ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£ > ãƒªãƒ¢ãƒ¼ãƒˆã‚¿ãƒ–
+ãƒªãƒ¢ãƒ¼ãƒˆ ãƒ‡ã‚¹ã‚¯ãƒˆãƒƒãƒ—ã‚’å®Ÿè¡Œã—ã¦ã„ã‚‹ã‚³ãƒ³ãƒ”ãƒ¥ãƒ¼ã‚¿ã‹ã‚‰ã®æŽ¥ç¶šã‚’è¨±å¯ã™ã‚‹â—‹ â†’ â—
+ãƒãƒƒãƒˆãƒ¯ãƒ¼ã‚¯ãƒ¬ãƒ™ãƒ«èªè¨¼ã§ãƒªãƒ¢ãƒ¼ãƒˆ ãƒ‡ã‚¹ã‚¯ãƒˆãƒƒãƒ—ã‚’å®Ÿè¡Œã—ã¦ã„ã‚‹ã‚³ãƒ³ãƒ”ãƒ¥ãƒ¼ã‚¿ã‹ã‚‰ã®æŽ¥ç¶šã‚’è¨±å¯ã™ã‚‹â–  â†’ â–¡
 
-EŒÂlÝ’è
-”wŒi - ƒfƒtƒHƒ‹ƒg
-ƒXƒNƒŠ[ƒ“ƒZƒCƒo[ - ‚È‚µ
+ãƒ»å€‹äººè¨­å®š
+èƒŒæ™¯ - ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆ
+ã‚¹ã‚¯ãƒªãƒ¼ãƒ³ã‚»ã‚¤ãƒãƒ¼ - ãªã—
 
-E“dŒ¹ƒIƒvƒVƒ‡ƒ“
-ƒoƒ‰ƒ“ƒX ¨ ‚ƒpƒtƒH[ƒ}ƒ“ƒX
+ãƒ»é›»æºã‚ªãƒ—ã‚·ãƒ§ãƒ³
+ãƒãƒ©ãƒ³ã‚¹ â†’ é«˜ãƒ‘ãƒ•ã‚©ãƒ¼ãƒžãƒ³ã‚¹
 
-xEWindows Update
-Ý’è‚Ì•ÏX
-XVƒvƒƒOƒ‰ƒ€‚ðŠm”F‚µ‚È‚¢œ
+xãƒ»Windows Update
+è¨­å®šã®å¤‰æ›´
+æ›´æ–°ãƒ—ãƒ­ã‚°ãƒ©ãƒ ã‚’ç¢ºèªã—ãªã„â—
 
-xEƒƒOƒIƒ“‰æ–Ê
-“c+R secpol.msc
-ƒ[ƒJƒ‹ƒZƒLƒ…ƒŠƒeƒBƒ|ƒŠƒV[‚É‚¨‚¢‚Ä [‘Î˜bŒ^ƒƒOƒIƒ“FÅŒã‚Ìƒ†[ƒU[–¼‚ð•\Ž¦‚µ‚È‚¢] ‚ðu—LŒøv‚ÉÝ’è‚·‚é
-(ƒfƒtƒHƒ‹ƒg‚Íu–³Œøv)B
+xãƒ»ãƒ­ã‚°ã‚ªãƒ³ç”»é¢
+ç”°+R secpol.msc
+ãƒ­ãƒ¼ã‚«ãƒ«ã‚»ã‚­ãƒ¥ãƒªãƒ†ã‚£ãƒãƒªã‚·ãƒ¼ã«ãŠã„ã¦ [å¯¾è©±åž‹ãƒ­ã‚°ã‚ªãƒ³ï¼šæœ€å¾Œã®ãƒ¦ãƒ¼ã‚¶ãƒ¼åã‚’è¡¨ç¤ºã—ãªã„] ã‚’ã€Œæœ‰åŠ¹ã€ã«è¨­å®šã™ã‚‹
+(ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã¯ã€Œç„¡åŠ¹ã€)ã€‚
 
-xxEƒCƒxƒ“ƒgƒƒOÝ’è 
-ƒCƒxƒ“ƒgƒrƒ…[ƒA[ > ƒvƒƒpƒeƒBÝ’è
-ƒAƒvƒŠƒP[ƒVƒ‡ƒ“AƒVƒXƒeƒ€AƒZƒLƒ…ƒŠƒeƒBƒƒO‚Ì‘S‚Ä‚É‚¨‚¢‚ÄAˆÈ‰º‚ÌÝ’è‚ðs‚¤B
-@Å‘åƒƒO ƒTƒCƒY@20480 KB ¨ 262144 KBi256 MB)
-@ƒCƒxƒ“ƒg ƒƒO‚ªÅ‘å’l‚É’B‚µ‚½‚Æ‚«
-@@ƒCƒxƒ“ƒg‚ðã‘‚«‚µ‚È‚¢‚ÅƒƒO‚ðƒA[ƒJƒCƒu‚·‚éœ
-@@
-Eƒlƒbƒgƒ[ƒNÚ‘±Fƒlƒbƒgƒ[ƒNƒAƒ_ƒvƒ^Ý’è 
-IPv6–³Œø
+xxãƒ»ã‚¤ãƒ™ãƒ³ãƒˆãƒ­ã‚°è¨­å®š 
+ã‚¤ãƒ™ãƒ³ãƒˆãƒ“ãƒ¥ãƒ¼ã‚¢ãƒ¼ > ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£è¨­å®š
+ã‚¢ãƒ—ãƒªã‚±ãƒ¼ã‚·ãƒ§ãƒ³ã€ã‚·ã‚¹ãƒ†ãƒ ã€ã‚»ã‚­ãƒ¥ãƒªãƒ†ã‚£ãƒ­ã‚°ã®å…¨ã¦ã«ãŠã„ã¦ã€ä»¥ä¸‹ã®è¨­å®šã‚’è¡Œã†ã€‚
+ã€€æœ€å¤§ãƒ­ã‚° ã‚µã‚¤ã‚ºã€€20480 KB â†’ 262144 KBï¼ˆ256 MB)
+ã€€ã‚¤ãƒ™ãƒ³ãƒˆ ãƒ­ã‚°ãŒæœ€å¤§å€¤ã«é”ã—ãŸã¨ã
+ã€€ã€€ã‚¤ãƒ™ãƒ³ãƒˆã‚’ä¸Šæ›¸ãã—ãªã„ã§ãƒ­ã‚°ã‚’ã‚¢ãƒ¼ã‚«ã‚¤ãƒ–ã™ã‚‹â—
+ã€€ã€€
+ãƒ»ãƒãƒƒãƒˆãƒ¯ãƒ¼ã‚¯æŽ¥ç¶šï¼šãƒãƒƒãƒˆãƒ¯ãƒ¼ã‚¯ã‚¢ãƒ€ãƒ—ã‚¿è¨­å®š 
+IPv6ç„¡åŠ¹
 
-IPv4 ‚ð IPv6 ‚æ‚è—Dæ‚É‚·‚é
+IPv4 ã‚’ IPv6 ã‚ˆã‚Šå„ªå…ˆã«ã™ã‚‹
 http://www.vwnet.jp/Windows/w7/IPv4/IPv4PriorityUP.html
 
-Eƒlƒbƒgƒ[ƒNƒ‚ƒjƒ^ 
-ƒlƒbƒgƒ[ƒNƒ‚ƒjƒ^ƒc[ƒ‹
+ãƒ»ãƒãƒƒãƒˆãƒ¯ãƒ¼ã‚¯ãƒ¢ãƒ‹ã‚¿ 
+ãƒãƒƒãƒˆãƒ¯ãƒ¼ã‚¯ãƒ¢ãƒ‹ã‚¿ãƒ„ãƒ¼ãƒ«
 Download Microsoft Message Analyzer from Official Microsoft Download Center
 http://www.microsoft.com/en-us/download/details.aspx?id=40308
- ¨ ƒCƒ“ƒXƒg[ƒ‹‚µ‚È‚¢
+ â†’ ã‚¤ãƒ³ã‚¹ãƒˆãƒ¼ãƒ«ã—ãªã„
  
-EƒAƒJƒEƒ“ƒgƒƒbƒNƒAƒEƒg‚Ìƒ|ƒŠƒV[
-ƒfƒtƒHƒ‹ƒg
-@ƒAƒJƒEƒ“ƒg ƒƒbƒNƒAƒEƒg‚Ì‚µ‚«‚¢’lF0 ‰ñƒƒOƒIƒ“‚ÉŽ¸”s
-@ƒƒbƒNƒAƒEƒg ƒJƒEƒ“ƒ^‚ÌƒŠƒZƒbƒgFŠY“–‚È‚µ
-@ƒƒbƒNƒAƒEƒg—LŒøŠúŠÔFŠY“–‚È‚µ
+ãƒ»ã‚¢ã‚«ã‚¦ãƒ³ãƒˆãƒ­ãƒƒã‚¯ã‚¢ã‚¦ãƒˆã®ãƒãƒªã‚·ãƒ¼
+ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆ
+ã€€ã‚¢ã‚«ã‚¦ãƒ³ãƒˆ ãƒ­ãƒƒã‚¯ã‚¢ã‚¦ãƒˆã®ã—ãã„å€¤ï¼š0 å›žãƒ­ã‚°ã‚ªãƒ³ã«å¤±æ•—
+ã€€ãƒ­ãƒƒã‚¯ã‚¢ã‚¦ãƒˆ ã‚«ã‚¦ãƒ³ã‚¿ã®ãƒªã‚»ãƒƒãƒˆï¼šè©²å½“ãªã—
+ã€€ãƒ­ãƒƒã‚¯ã‚¢ã‚¦ãƒˆæœ‰åŠ¹æœŸé–“ï¼šè©²å½“ãªã—
 
-EƒT[ƒrƒX‹N“®Ý’è š
-Print Spooler FŽ©“® ¨ –³Œø
+ãƒ»ã‚µãƒ¼ãƒ“ã‚¹èµ·å‹•è¨­å®š â˜…
+Print Spooler ï¼šè‡ªå‹• â†’ ç„¡åŠ¹
 
-EWindowsƒtƒ@ƒCƒA[ƒEƒH[ƒ‹
-ˆÈ‰º‚ð—LŒøi‹–‰Âj
-@ƒtƒ@ƒCƒ‹‚ÆƒvƒŠƒ“ƒ^[‚Ì‹¤—L (ƒGƒR[—v‹ - ICMPv4 ŽóM)
-@ƒŠƒ‚[ƒg ƒfƒXƒNƒgƒbƒv - ƒ†[ƒU[ ƒ‚[ƒh (TCP ŽóM)
-@ƒŠƒ‚[ƒg ƒfƒXƒNƒgƒbƒv - ƒ†[ƒU[ ƒ‚[ƒh (UDP ŽóM)
-@ƒŠƒ‚[ƒg ƒfƒXƒNƒgƒbƒv - ƒVƒƒƒhƒE (TCP ŽóM)
+ãƒ»Windowsãƒ•ã‚¡ã‚¤ã‚¢ãƒ¼ã‚¦ã‚©ãƒ¼ãƒ«
+ä»¥ä¸‹ã‚’æœ‰åŠ¹ï¼ˆè¨±å¯ï¼‰
+ã€€ãƒ•ã‚¡ã‚¤ãƒ«ã¨ãƒ—ãƒªãƒ³ã‚¿ãƒ¼ã®å…±æœ‰ (ã‚¨ã‚³ãƒ¼è¦æ±‚ - ICMPv4 å—ä¿¡)
+ã€€ãƒªãƒ¢ãƒ¼ãƒˆ ãƒ‡ã‚¹ã‚¯ãƒˆãƒƒãƒ— - ãƒ¦ãƒ¼ã‚¶ãƒ¼ ãƒ¢ãƒ¼ãƒ‰ (TCP å—ä¿¡)
+ã€€ãƒªãƒ¢ãƒ¼ãƒˆ ãƒ‡ã‚¹ã‚¯ãƒˆãƒƒãƒ— - ãƒ¦ãƒ¼ã‚¶ãƒ¼ ãƒ¢ãƒ¼ãƒ‰ (UDP å—ä¿¡)
+ã€€ãƒªãƒ¢ãƒ¼ãƒˆ ãƒ‡ã‚¹ã‚¯ãƒˆãƒƒãƒ— - ã‚·ãƒ£ãƒ‰ã‚¦ (TCP å—ä¿¡)
 
 
-EƒŒƒWƒXƒgƒŠƒ`ƒ…[ƒjƒ“ƒO
+ãƒ»ãƒ¬ã‚¸ã‚¹ãƒˆãƒªãƒãƒ¥ãƒ¼ãƒ‹ãƒ³ã‚°
 
-ƒuƒ‰ƒEƒWƒ“ƒOƒŠƒXƒg‚É•\Ž¦‚³‚ê‚È‚¢‚æ‚¤‚É‚·‚é 
+ãƒ–ãƒ©ã‚¦ã‚¸ãƒ³ã‚°ãƒªã‚¹ãƒˆã«è¡¨ç¤ºã•ã‚Œãªã„ã‚ˆã†ã«ã™ã‚‹ 
 	HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\Lanmanserver\parameters
 		Hidden
-		 ¨ DWORD 1
+		 â†’ DWORD 1
 		 
-ƒ\[ƒXƒ‹[ƒeƒBƒ“ƒO‚Ì–³Œø‰»
+ã‚½ãƒ¼ã‚¹ãƒ«ãƒ¼ãƒ†ã‚£ãƒ³ã‚°ã®ç„¡åŠ¹åŒ–
 	HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\tcpip\parameters
 		DisableIPSourceRouting
-		 ¨ DWORD@2
+		 â†’ DWORDã€€2
 
-”½‰ž‚µ‚È‚¢ƒQ[ƒgƒEƒFƒC‚ÌŽ©“®ŒŸo‚ð–³Œø‚É‚·‚é 
+åå¿œã—ãªã„ã‚²ãƒ¼ãƒˆã‚¦ã‚§ã‚¤ã®è‡ªå‹•æ¤œå‡ºã‚’ç„¡åŠ¹ã«ã™ã‚‹ 
 	HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\tcpip\parameters
 		EnableDeadGWDetect
-		 ¨ DWORD 0
+		 â†’ DWORD 0
 
-ICMPƒŠƒ_ƒCƒŒƒNƒg‚É‚æ‚éOSPF¶¬ƒ‹[ƒg‚Ìã‘‚«‚ð–³Œø‚É‚·‚é 
+ICMPãƒªãƒ€ã‚¤ãƒ¬ã‚¯ãƒˆã«ã‚ˆã‚‹OSPFç”Ÿæˆãƒ«ãƒ¼ãƒˆã®ä¸Šæ›¸ãã‚’ç„¡åŠ¹ã«ã™ã‚‹ 
 	HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\tcpip\parameters
 		EnableICMPRedirect
-		 ¨ DWORD 0
+		 â†’ DWORD 0
 
-Keep-AliveƒpƒPƒbƒg‚Ì‘—MŠÔŠu‚ð“KØ‚ÉÝ’è‚·‚é 
+Keep-Aliveãƒ‘ã‚±ãƒƒãƒˆã®é€ä¿¡é–“éš”ã‚’é©åˆ‡ã«è¨­å®šã™ã‚‹ 
 	HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\tcpip\parameters
 		KeepAliveTime
-		 ¨ DWORD 300000i5 •ªjiŠù’èF7200000 i2 ŽžŠÔjj
+		 â†’ DWORD 300000ï¼ˆ5 åˆ†ï¼‰ï¼ˆæ—¢å®šï¼š7200000 ï¼ˆ2 æ™‚é–“ï¼‰ï¼‰
 	 
-IRDP‚ð–³Œø‚É‚·‚é 
+IRDPã‚’ç„¡åŠ¹ã«ã™ã‚‹ 
 	HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\tcpip\parameters
 		PerformRouterDiscovery
-		 ¨ DWORD 0
+		 â†’ DWORD 0
 		
- IRDP‚Æ‚Í
+ IRDPã¨ã¯
  http://www.infraexpert.com/study/gateway2.htm
 
-TCP ‚ªŒÂX‚Ìƒf[ƒ^ ƒZƒOƒƒ“ƒg‚ðÄ‘—M‚·‚é‰ñ”‚ðÝ’è‚·‚é 
+TCP ãŒå€‹ã€…ã®ãƒ‡ãƒ¼ã‚¿ ã‚»ã‚°ãƒ¡ãƒ³ãƒˆã‚’å†é€ä¿¡ã™ã‚‹å›žæ•°ã‚’è¨­å®šã™ã‚‹ 
 	HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\tcpip\parameters
 	TcpMaxDataRetransmissions
-	 ¨ DWORD 3
+	 â†’ DWORD 3
 		
-Backinfo.exe‚ÌŽ©“®‹N“®iƒfƒXƒNƒ`ƒbƒv‚ÉƒzƒXƒgî•ñ‚ð•\Ž¦‚·‚éj
+Backinfo.exeã®è‡ªå‹•èµ·å‹•ï¼ˆãƒ‡ã‚¹ã‚¯ãƒãƒƒãƒ—ã«ãƒ›ã‚¹ãƒˆæƒ…å ±ã‚’è¡¨ç¤ºã™ã‚‹ï¼‰
 	HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\BackInfo
 		BackInfo
-		 ¨ REG_SZ C:\Program Files\Tech Tools\BackInfo.exe
-	¦‚ ‚ç‚©‚¶‚ßexeƒtƒ@ƒCƒ‹‚ð’u‚¢‚Ä‚¨‚­
+		 â†’ REG_SZ C:\Program Files\Tech Tools\BackInfo.exe
+	â€»ã‚ã‚‰ã‹ã˜ã‚exeãƒ•ã‚¡ã‚¤ãƒ«ã‚’ç½®ã„ã¦ãŠã
 	
 	
 	
 ------------------------------------------------
-<–¢ŽÀŽ{>
-Eƒlƒbƒgƒ[ƒNƒ‚ƒjƒ^
-–{ƒVƒXƒeƒ€‚Å‚ÍAƒlƒbƒgƒ[ƒNŠÖ˜A‚Ìƒgƒ‰ƒuƒ‹ƒVƒ…[ƒg‚Ì‚½‚ßƒlƒbƒgƒ[ƒNƒ‚ƒjƒ^ƒc[ƒ‹‚ð•W€‚ÅƒCƒ“ƒXƒg[ƒ‹‚·‚é•ûj‚Æ‚·‚éB‚µ‚©‚µAƒlƒbƒgƒ[ƒN ƒ‚ƒjƒ^ ƒc[ƒ‹‚Í OS •W€ƒRƒ“ƒ|[ƒlƒ“ƒg‚©‚çœŠO‚³‚ê‚Ä‚¢‚é‚½‚ßAˆÈ‰º‚ÌƒTƒCƒg‚æ‚èƒ_ƒEƒ“ƒ[ƒh‚µAƒCƒ“ƒXƒg[ƒ‹‚·‚é‚à‚Ì‚Æ‚·‚éB
+<æœªå®Ÿæ–½>
+ãƒ»ãƒãƒƒãƒˆãƒ¯ãƒ¼ã‚¯ãƒ¢ãƒ‹ã‚¿
+æœ¬ã‚·ã‚¹ãƒ†ãƒ ã§ã¯ã€ãƒãƒƒãƒˆãƒ¯ãƒ¼ã‚¯é–¢é€£ã®ãƒˆãƒ©ãƒ–ãƒ«ã‚·ãƒ¥ãƒ¼ãƒˆã®ãŸã‚ãƒãƒƒãƒˆãƒ¯ãƒ¼ã‚¯ãƒ¢ãƒ‹ã‚¿ãƒ„ãƒ¼ãƒ«ã‚’æ¨™æº–ã§ã‚¤ãƒ³ã‚¹ãƒˆãƒ¼ãƒ«ã™ã‚‹æ–¹é‡ã¨ã™ã‚‹ã€‚ã—ã‹ã—ã€ãƒãƒƒãƒˆãƒ¯ãƒ¼ã‚¯ ãƒ¢ãƒ‹ã‚¿ ãƒ„ãƒ¼ãƒ«ã¯ OS æ¨™æº–ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‹ã‚‰é™¤å¤–ã•ã‚Œã¦ã„ã‚‹ãŸã‚ã€ä»¥ä¸‹ã®ã‚µã‚¤ãƒˆã‚ˆã‚Šãƒ€ã‚¦ãƒ³ãƒ­ãƒ¼ãƒ‰ã—ã€ã‚¤ãƒ³ã‚¹ãƒˆãƒ¼ãƒ«ã™ã‚‹ã‚‚ã®ã¨ã™ã‚‹ã€‚
  Download Microsoft Message Analyzer from Official Microsoft Download Center
   http://www.microsoft.com/en-us/download/details.aspx?id=40308
 
-EBackupAndRotateArchivedEventlogs
+ãƒ»BackupAndRotateArchivedEventlogs
 C:\Program Files\Tech Tools\BackupAndRotateArchivedEventLogs\BackupAndRotateArchivedEventLogs.bat
