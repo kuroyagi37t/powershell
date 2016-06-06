@@ -1,0 +1,2 @@
+# Windows Store App Remove
+Get-AppxPackage |Where-object {$_.Name -ne "Microsoft.Windows.ShellExpreienceHost"} | Where-object {$_.Name -ne "Microsoft.Cortana"} |
