@@ -1,2 +1,6 @@
 # Windows Store App Remove
 Get-AppxPackage |Where-object {$_.Name -ne "Microsoft.Windows.ShellExpreienceHost"} | Where-object {$_.Name -ne "Microsoft.Cortana"} |
+
+# OneDrive Remove 
+taskkill.exe /f /im OneDrive.exe
+%SystemRoot%\SysWOW64\onedrivesetup.exe /uninstall
