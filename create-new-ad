@@ -1,0 +1,26 @@
+## Rename-Computer -NewName "DC01" -Force -restart 
+
+## ADDS 
+Install-WindowsFeature AD-Domain-Services,GPMC -IncludeManagementTools -Restart
+## 
+Add-Windows-feature RSAT-ADDS
+
+
+#周辺ツールがCLI経由だと入らないようなので入れる
+Add-WindowsFeature RSAT-ADDS
+ 
+ 
+##
+Import-Module ADDSDeployment
+Install-ADDSForest -DomainName "testdom.local" -ForestMode "Win2012R2" -DomainMode "Win2012R2" \
+  -InstallDns:$true -CreateDnsDelegation:$false -DomainNetbiosName "TESTDOM" \
+  -DatabasePath "C:\Windows\NTDS" -LogPath "C:\Windows\NTDS" -SysvolPath "C:\Windows\SYSVOL" \
+  -NoRebootOnCompletion:$false -Force:$true
+  
+#ドメインコントローラのインストール
+#Import-Module ADDSDeployment
+###Install-ADDSDomainController -DomainName "Testdom.local" -NoGlobalCatalog:$False \
+##  -CreateDNSDelegation:$False -Credential (Get-Credential) \
+##  -CriticalReplicationOnly:$False -DatabasePath "C:\Windows\NTDS" -InstallDNS:$True -LogPath "C:\Windows\NTDS" -SysVolPath "C:\Windows\SysVol" -NoRebootOnCompletion:$false -Force:$true
+
+
