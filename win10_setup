@@ -1,5 +1,8 @@
 # Windows Store App Remove
-Get-AppxPackage |Where-object {$_.Name -ne "Microsoft.Windows.ShellExpreienceHost"} | Where-object {$_.Name -ne "Microsoft.Cortana"} |
+Get-AppxPackage |Where-object {$_.Name -ne "Microsoft.Windows.ShellExpreienceHost"} | Where-object {$_.Name -ne "Microsoft.Cortana"} | Remove-AppxPackage -alluser
+
+# Windows Store ProvisionedPackage Remove
+Get-AppxProvisionedPackage -online | Remove-AppxProvisionedPackage -online 
 
 # OneDrive Remove(Uninstall) 
 taskkill.exe /f /im OneDrive.exe
