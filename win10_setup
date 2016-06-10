@@ -1,3 +1,5 @@
+Rename-Computer -NewName "DC01" -Force -restart
+
 # Windows Store ProvisionedPackage Remove
 ##Get-AppxProvisionedPackage -online | Remove-AppxProvisionedPackage -online 
 Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*3DBuilder*” | Remove-AppxProvisionedPackage -Online
