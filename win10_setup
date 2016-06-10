@@ -1,4 +1,18 @@
 Rename-Computer -NewName "DC01" -Force -restart
+### IP Address
+Set-NetIPInterface -InterfaceIndex 13 -Dhcp Disable
+New-NetIPAddress -InterfaceIndex 3 -IPAddress "172.19.199.25" -AddressFamily IPv4 -PrefixLength 24 -DefaultGateway "172.19.199.1"
+### DNS 
+Set-DnsClientServerAddress -InterfaceIndex 3 -ServerAddresses "172.19.199.1"
+
+
+### Windows Update Disable
+$WindowsUpdatePath = "HKLM:SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\"
+$AutoUpdatePath = "HKLM:SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+
+New-Item -Path $WindowsUpdatePath
+New-Item -Path $AutoUpdatePath
+Set-ItemProperty -Path $AutoUpdatePath -Name NoAutoUpdate -Value 1
 
 # Windows Store ProvisionedPackage Remove
 ##Get-AppxProvisionedPackage -online | Remove-AppxProvisionedPackage -online 
