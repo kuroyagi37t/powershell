@@ -1,32 +1,32 @@
 # Windows Store ProvisionedPackage Remove
 ##Get-AppxProvisionedPackage -online | Remove-AppxProvisionedPackage -online 
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “3DBuilder” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “BingFinance” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “BingNews” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “BingSports” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “BingWeather” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “Getstarted” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “Messaging” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “MicrosoftOfficeHub” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “MicrosoftSolitaireCollection” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “Office.OneNote” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “People” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “SkypeApp” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “Windows.Photos” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “WindowsAlarms” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “WindowsCalculator” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “WindowsCamera” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “windowscommunicationsapps” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “WindowsMaps” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “WindowsPhone” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “WindowsSoundRecorder” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “WindowsStore” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “XboxApp” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “ZuneMusic” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “ZuneVideo” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “ConnectivityStore” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “CommsPhone” | Remove-AppxProvisionedPackage -Online
-Get-AppxProvisionedPackage -Online | Where DisplayName -Like “Office.Sway” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*3DBuilder*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*BingFinance*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*BingNews*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*BingSports*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*BingWeather*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*Getstarted*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*Messaging*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*MicrosoftOfficeHub*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*MicrosoftSolitaireCollection*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*Office.OneNote*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*People*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*SkypeApp*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*Windows.Photos*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*WindowsAlarms*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*WindowsCalculator*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*WindowsCamera*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*windowscommunicationsapps*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*WindowsMaps*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*WindowsPhone*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*WindowsSoundRecorder*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*WindowsStore*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*XboxApp*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*ZuneMusic*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*ZuneVideo*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*ConnectivityStore*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*CommsPhone*” | Remove-AppxProvisionedPackage -Online
+Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*Office.Sway*” | Remove-AppxProvisionedPackage -Online
 
 
 # Windows Store App Remove
