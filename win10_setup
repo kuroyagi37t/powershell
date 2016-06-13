@@ -1,10 +1,11 @@
 Rename-Computer -NewName "DC01" -Force -restart
-### IP Address
+### IP Address  (PowerShell-V4)
 Set-NetIPInterface -InterfaceIndex 13 -Dhcp Disable
 New-NetIPAddress -InterfaceIndex 3 -IPAddress "172.19.199.25" -AddressFamily IPv4 -PrefixLength 24 -DefaultGateway "172.19.199.1"
-### DNS 
+### DNS Setting (PowerShell-V4)
 Set-DnsClientServerAddress -InterfaceIndex 3 -ServerAddresses "172.19.199.1"
-
+### NIC Profile  Private (PowerShell V4)
+Set-NetConnectionProfile -NetworkCategory Private
 
 ### Windows Update Disable
 $WindowsUpdatePath = "HKLM:SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\"
@@ -14,7 +15,8 @@ New-Item -Path $WindowsUpdatePath
 New-Item -Path $AutoUpdatePath
 Set-ItemProperty -Path $AutoUpdatePath -Name NoAutoUpdate -Value 1
 
-# Windows Store ProvisionedPackage Remove
+### Windows 10 Only 
+### Windows Store ProvisionedPackage Remove
 ##Get-AppxProvisionedPackage -online | Remove-AppxProvisionedPackage -online 
 Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*3DBuilder*” | Remove-AppxProvisionedPackage -Online
 Get-AppxProvisionedPackage -Online | Where DisplayName -Like “*BingFinance*” | Remove-AppxProvisionedPackage -Online
@@ -87,8 +89,8 @@ Get-AppxPackage *communi* | Remove-AppxPackage
 taskkill.exe /f /im OneDrive.exe
 %SystemRoot%\SysWOW64\onedrivesetup.exe /uninstall
 # OneDrive Directory & Registrory Remove
-rd “%UserProfile%\OneDrive” /Q /S 
-rd “%LocalAppData%\Microsoft\OneDrive” /Q /S
-rd “%ProgramData%\Microsoft OneDrive” /Q /S
+cmd /c 'rd “%UserProfile%\OneDrive” /Q /S' 
+cmd /c 'rd “%LocalAppData%\Microsoft\OneDrive” /Q /S'
+cmd /c 'rd “%ProgramData%\Microsoft OneDrive” /Q /S'
 REG Delete “HKEY_CLASSES_ROOT\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}” /f
 REG Delete “HKEY_CLASSES_ROOT\Wow6432Node\CLSID\{018D5C66-4533-4307-9B53-224DE2ED1FE6}” /f
