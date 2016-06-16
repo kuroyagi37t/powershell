@@ -1,3 +1,36 @@
+### レジストリ追加/更新
+function RegSet( $RegPath, $RegKey, $RegKeyType, $RegKeyValue ){
+    # レジストリそのものの有無確認
+    $Elements = $RegPath -split "\\"
+    $RegPath = ""
+    $FirstLoop = $True
+    foreach ($Element in $Elements ){
+        if($FirstLoop){
+            $FirstLoop = $False
+        }else{
+            $RegPath += "\"
+        }
+        $RegPath += $Element
+        if( -not (test-path $RegPath) ){
+            echo "Add Registry : $RegPath"
+            md $RegPath
+        }
+    }
+    # Key有無確認
+    $Result = Get-ItemProperty $RegPath -name $RegKey -ErrorAction SilentlyContinue
+    # キーがあった時
+    if( $Result -ne $null ){
+        Set-ItemProperty $RegPath -name $RegKey -Value $RegKeyValue
+    } else{
+    # キーが無かった時 キーを追加する
+        New-ItemProperty $RegPath -name $RegKey -PropertyType $RegKeyType -Value $RegKeyValue
+    }
+    Get-ItemProperty $RegPath -name $RegKey
+}
+
+
+
+
 Rename-Computer -NewName "DC01" -Force -restart
 ### IP Address  (PowerShell-V4)
 Set-NetIPInterface -InterfaceIndex 13 -Dhcp Disable
