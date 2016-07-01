@@ -1,0 +1,195 @@
+;レジストリ情報　http://winintro.com/
+
+;Windowsコンポーネント/OneDrive
+;  OneDrive をファイル記憶域として使用できないようにする：Disable
+Computer
+SOFTWARE\Policies\Microsoft\Windows\OneDrive
+DisableFileSyncNGSC
+DWORD:1
+
+;Windowsコンポーネント/Internet Explorer
+;アドオンのパフォーマンスの通知を無効にする :[Enable]
+Computer
+Software\Microsoft\Windows\CurrentVersion\Policies\Ext
+DisableAddonLoadTimePerformanceNotifications
+DWORD:1
+
+;Windowsコンポーネント/Internet Explorer
+;最新バージョンの Internet Explorer を自動的にインストールする [Disable]
+Computer
+Software\Policies\Microsoft\Internet Explorer\Main
+EnableAutoUpgrade
+DWORD:0
+
+;Windowsコンポーネント/Internet Explorer
+;初回実行ウィザードを実行しないようにする [Enable]
+;ホーム ページに直接移動する
+Computer
+Software\Policies\Microsoft\Internet Explorer\Main
+DisableFirstRunCustomize
+DWORD:1
+
+;Windowsコンポーネント/Internet Explorer
+;新たにインストールされたアドオンを自動的にアクティブ化する [Enable]
+Computer
+Software\Microsoft\Windows\CurrentVersion\Policies\Ext
+IgnoreFrameApprovalCheck
+DWORD:1
+
+;Windows コンポーネント / PC 設定の同期
+;同期しない
+Computer
+Software\Policies\Microsoft\Windows\SettingSync
+DisableSettingSync
+DWORD:2
+
+;Windows コンポーネント / PC 設定の同期
+;同期しない
+;ユーザーが同期をオンにできるようにします。
+Computer
+Software\Policies\Microsoft\Windows\SettingSync
+DisableSettingSyncUserOverride
+DWORD:1
+
+;Windows コンポーネント / Windows Mail
+;Turn off Windows Mail application
+Computer
+SOFTWARE\Policies\Microsoft\Windows Mail
+ManualLaunchAllowed
+DWORD:1
+
+;Windows コンポーネント /Windows Media Player
+;自動更新を禁止する [Enable]
+Computer
+Software\Policies\Microsoft\WindowsMediaPlayer
+DisableAutoUpdate
+DWORD:1
+
+;Windows コンポーネント /Windows Media Player
+;初期設定ダイアログ ボックスを表示しない [Enable]
+Computer
+Software\Policies\Microsoft\WindowsMediaPlayer
+GroupPrivacyAcceptance
+DWORD:1
+
+;Windows コンポーネント /Windows Update
+;アップグレードおよび更新を延期する [Enable]
+Computer
+Software\Policies\Microsoft\Windows\WindowsUpdate
+DeferUpgrade
+DWORD:1
+
+;Windows コンポーネント/エクスプローラー
+;'新しいアプリケーションがインストールされました' の通知を表示しない
+Computer
+Software\Policies\Microsoft\Windows\Explorer
+NoNewAppAlert
+DWORD:1
+
+;Windows コンポーネント/エクスプローラー
+;電源オプション メニューにスリープを表示する [Disable]
+Computer
+Software\Policies\Microsoft\Windows\Explorer
+ShowSleepOption
+DWORD:0
+
+;Windows コンポーネント/エクスプローラー
+;電源オプション メニューに休止状態を表示する [Disable]
+Computer
+Software\Policies\Microsoft\Windows\Explorer
+ShowHibernateOption
+DWORD:0
+
+;Windows コンポーネント/ストア
+;Disable all apps from Windows Store [Enable]
+Computer
+Software\Policies\Microsoft\WindowsStore
+DisableStoreApps
+DWORD:0
+
+;Windows コンポーネント/ストア
+;ストア アプリケーションをオフにする [Enable]
+Computer
+Software\Policies\Microsoft\WindowsStore
+RemoveWindowsStore
+DWORD:0
+
+;Windows コンポーネント/ストア
+;更新プログラムの自動ダウンロードおよび自動インストールをオフにする [Enable]
+Computer
+Software\Policies\Microsoft\WindowsStore
+AutoDownload
+DWORD:2
+
+;システム/ログオン
+;ネットワークの選択の UI を表示しない [Enable]
+Computer
+Software\Policies\Microsoft\Windows\System
+DontDisplayNetworkSelectionUI
+DWORD:1
+
+;システム/ログオン
+;コンピューターの起動およびログオンで常にネットワークを待つ [Enable]
+Computer
+Software\Policies\Microsoft\Windows NT\CurrentVersion\Winlogon
+SyncForegroundPolicy
+DWORD:1
+
+;システム/ログオン
+;ユーザーの簡易切り替えのエントリ ポイントを非表示にする
+Computer
+Software\Microsoft\Windows\CurrentVersion\Policies\System
+HideFastUserSwitching
+DWORD:1
+
+;システム/ログオン
+;初回サインインのアニメーションを表示する [Disable]
+Computer
+Software\Microsoft\Windows\CurrentVersion\Policies\System
+EnableFirstLogonAnimation
+DWORD:0
+
+;ネットワーク/オフライン ファイル
+;[オフラインで使用する] コマンドを削除する [Enable]
+Computer
+Software\Policies\Microsoft\Windows\NetCache
+NoMakeAvailableOffline
+DWORD:1
+
+
+;ネットワーク/オフライン ファイル
+;[オフライン作業] コマンドを削除する [Enable]
+Computer
+Software\Policies\Microsoft\Windows\NetCache
+WorkOfflineDisabled
+DWORD:1
+
+;ユーザーの構成/管理テンプレート
+;タスク バーと [スタート] メニュー
+;Windows ストア アプリをタスク バーに表示する [Disable]
+User
+Software\Policies\Microsoft\Windows\Explorer
+ShowWindowsStoreAppsOnTaskbar
+DWORD:2
+
+;タスク バーと [スタート] メニュー
+;ユーザーに [スタート] からアプリケーションをアンインストールさせないようにする [Enable]
+User
+Software\Policies\Microsoft\Windows\Explorer
+NoUninstallFromStart
+DWORD:1
+
+;タスク バーと [スタート] メニュー
+;通知とアクション センターを削除する [Enable]
+User
+Software\Policies\Microsoft\Windows\Explorer
+DisableNotificationCenter
+DWORD:1
+
+;タスク バーと [スタート] メニュー
+;タスク バーから固定されたプログラムを削除する [Enable]
+User
+Software\Policies\Microsoft\Windows\Explorer
+TaskbarNoPinnedList
+DWORD:1
+
