@@ -1,0 +1,424 @@
+Template.ps1
+# Windows PowerShell
+# テンプレート
+
+param($dummy)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+$WarningPreference = "Continue"
+$VerbosePreference = "Continue"
+$DebugPreference = "Continue"
+
+######################################################################
+### 関数定義
+######################################################################
+
+# 使用方法を出力する。
+# return - なし
+function U-Write-Usage() {
+    Write-Output "使い方：$psName"
+}
+
+function FTP-Get() {
+	$url = "ftp://ftp.example.com/pub"	# 一覧を取得するURL
+	$user = "someone"					# ログインID
+	$pass = "secret"					# パスワード
+
+	$wr = [System.Net.WebRequest]::Create($url)
+	$wr.Credentials = New-Object System.Net.NetworkCredential($user, $pass)
+	$wr.Method = [System.Net.WebRequestMethods+Ftp]::ListDirectoryDetails
+	$res = $wr.GetResponse()
+	$rs = New-Object System.IO.StreamReader($res.GetResponseStream())
+	$list = $rs.ReadToEnd()
+	$rs.Close()
+	$res.Close()
+
+
+# 主処理を実行する。
+# return - なし
+function U-Run-Main() {
+
+    Write-Output $dummy
+}
+
+
+$pass1='password'
+$local_target1 = 'D:\997\'
+$ftp_uri1='ftp://ftp.myserver.com'
+$subfolder1='/outbound/997/'
+ 
+function GetFilesListAsArray($user,$pass,$local_target,$ftp_uri,$subfolder)
+{
+ # ftp address from where to download the files
+ $ftp_urix = $ftp_uri + $subfolder
+ $uri=[system.URI] $ftp_urix
+ 
+$ftp=[system.net.ftpwebrequest]::Create($uri)
+ 
+if($user)
+ {
+ $ftp.Credentials=New-Object System.Net.NetworkCredential($user,$pass)
+ }
+ #Get a list of files in the current directory.
+ #Use ListDirectoryDetails instead if you need date, size and other additional file information.
+ $ftp.Method=[system.net.WebRequestMethods+ftp]::ListDirectory
+ $ftp.UsePassive=$true
+ 
+try
+ {
+ $response=$ftp.GetResponse()
+ $strm=$response.GetResponseStream()
+ $reader=New-Object System.IO.StreamReader($strm,'UTF-8')
+ $list=$reader.ReadToEnd()
+ $lines=$list.Split("`n")
+ return $lines
+ }
+ catch{
+ $_|fl * -Force
+ }
+}
+ 
+function DownloadFile ($sourceuri,$targetpath,$username,$password){
+ # Create a FTPWebRequest object to handle the connection to the ftp server
+ $ftprequest = [System.Net.FtpWebRequest]::create($sourceuri)
+ 
+# set the request's network credentials for an authenticated connection
+ $ftprequest.Credentials = New-Object System.Net.NetworkCredential($username,$password)
+ 
+$ftprequest.Method = [System.Net.WebRequestMethods+Ftp]::DownloadFile
+ $ftprequest.UseBinary = $true
+ $ftprequest.KeepAlive = $false
+ 
+# send the ftp request to the server
+ $ftpresponse = $ftprequest.GetResponse()
+ 
+# get a download stream from the server response
+ $responsestream = $ftpresponse.GetResponseStream()
+ 
+# create the target file on the local system and the download buffer
+ try
+ {
+ $targetfile = New-Object IO.FileStream ($targetpath,[IO.FileMode]::Create)
+ "File created: $targetpath"
+ [byte[]]$readbuffer = New-Object byte[] 1024
+ 
+# loop through the download stream and send the data to the target file
+ do{
+ $readlength = $responsestream.Read($readbuffer,0,1024)
+ $targetfile.Write($readbuffer,0,$readlength)
+ }
+ while ($readlength -ne 0)
+ 
+$targetfile.close()
+ }
+ catch
+ {
+ $_|fl * -Force
+ }
+ 
+}
+function DeleteFile ($file,$username,$password){
+ # Delete files from FTP server after download
+ $uri2=[system.URI] $file
+ $request = [system.Net.FtpWebRequest]::Create($uri2)
+ $request.Credentials = New-Object System.Net.NetworkCredential($username,$password)
+ $request.Method = [System.Net.WebRequestMethods+FTP]::DeleteFile
+ $response = $request.GetResponse()
+ "Deleted from FTP: $source" -f $response.StatusDescription
+ $response.Close()
+}
+ 
+$lines = GetFilesListAsArray $user1 $pass1 $local_target1 $ftp_uri1 $subfolder1
+'List of files OK'
+$total_files = 0
+foreach ($line in $lines){
+ if ($line -ne '') {
+ #TRIM the file_name because if it contains blank spaces you will get errors when creating the file
+ $file_name = $line.ToString().Trim()
+ $source = $ftp_uri1 + $subfolder1 + $file_name
+ $target = $local_target1 + $file_name
+ DownloadFile $source $target $user1 $pass1
+ DeleteFile $source $user1 $pass1
+ $total_files = $total_files + 1
+ }
+}
+"Total files downloaded: $total_files"
+
+
+
+
+
+
+
+
+
+
+
+
+######################################################################
+### 処理実行
+######################################################################
+
+###
+### 前処理
+###
+
+$baseDir = Convert-Path $(Split-Path $MyInvocation.InvocationName -Parent)
+$psName = Split-Path $MyInvocation.InvocationName -Leaf
+$psBaseName = $psName -replace "\.ps1$", ""
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+
+Write-Verbose "$psName Start"
+
+# 設定ファイル読み込み
+$iniPath = "${baseDir}\${psBaseName}.ini"
+if (Test-Path -PathType Leaf $iniPath) {
+    Write-Debug "設定ファイル読み込み $iniPath"
+    $ini = @{}
+    Get-Content $iniPath | %{ $ini += ConvertFrom-StringData $_ }
+}
+
+###
+### 主処理
+###
+
+if ($dummy -eq $null) {
+    U-Write-Usage
+} else {
+    U-Run-Main
+}
+
+###
+### 後処理
+###
+
+Write-Verbose "$psName End"
+
+#========================================================
+# AD Function 
+#========================================================
+Function Set-PrimaryGroup {
+	Param (
+			[string]$username=$(Throw "Error: Please enter a username!"),
+			[string]$groupname="Domain Users"
+		)
+	Process	{
+    	Try	{
+	        #Get the DistinguishedName of the user for you want to change the primary group
+			$UserDistinguishedName = (Get-ADUser -Identity $username -ErrorAction Stop).DistinguishedName
+			Try {
+				#Get SID of the Group that will become the primary group
+				$GroupSid = (Get-ADGroup -Identity $groupname -Properties PrimaryGroupID -ErrorAction Stop).SID
+
+				#Get the last 4 digits of the SID to become te PrimaryGroupID
+				$PrimaryGroupID = $GroupSid.Value.Substring($groupsid.Value.LastIndexOf('-')+1)
+
+				#Replace the PrimaryGroupID of the user with its new value. The user has to be already a member of this group.
+				Set-ADObject -Identity "$UserDistinguishedName" -replace @{PrimaryGroupID=$PrimaryGroupID}
+				Write-Host "$groupname set as primary group for user $username"
+			}
+			Catch {
+				Write-Host "Error: Unable to find the PrimaryGroupID for group $GroupName! Maybe the group does not exist." -ForegroundColor red
+			}
+		}
+		Catch {
+			Write-Host "Error: Unable to find user $username!" -ForegroundColor red
+		}
+	}
+}
+
+Function Add-TeachersADGroup {
+	Param (
+			[string]$username=$(Throw "Error: Please enter a username!"),
+		)
+	Process	{
+    	Try	{
+	        #Get the DistinguishedName of the user for you want to change the primary group
+			Get-ADUser -Identity $username -ErrorAction Stop
+			Try {
+				#Get SID of the Group that will become the primary group
+				Add-ADGroupMembers -Identity "TeachersUsers"  -Member $username
+				Add-ADGroupMembers -Identity "PrintAdmins"    -Member $username
+				Add-ADGroupMembers -Identity "linux_teachers" -Member $username
+				Write-Host "$groupname set as primary group for user $username"
+			}
+			Catch {
+				Write-Host "Error: Unable to find the PrimaryGroupID for group $GroupName! Maybe the group does not exist." -ForegroundColor red
+			}
+		}
+		Catch {
+			Write-Host "Error: Unable to find user $username!" -ForegroundColor red
+		}
+	}
+}
+
+Function Add-StudentsADGroup {
+	Param (
+			[string]$username=$(Throw "Error: Please enter a username!"),
+			[string]$groupname="Domain Users"
+		)
+	Process	{
+    	Try	{
+	        #Get the DistinguishedName of the user for you want to change the primary group
+			Get-ADUser -Identity $username -ErrorAction Stop
+			Try {
+				#Get SID of the Group that will become the primary group
+				Add-ADGroupMembers -Identity "StudentsUsers"  -Member $username
+				Add-ADGroupMembers -Identity "linux_"&$groupname -Member $username
+				Add-ADGroupMembers -Identity $groupname       -Member $username
+				Write-Host "$groupname set as primary group for user $username"
+			}
+			Catch {
+				Write-Host "Error: Unable to find the PrimaryGroupID for group $GroupName! Maybe the group does not exist." -ForegroundColor red
+			}
+		}
+		Catch {
+			Write-Host "Error: Unable to find user $username!" -ForegroundColor red
+		}
+	}
+}
+
+#========================================================
+# File Server Function 
+#========================================================
+Function Add-WinHome {
+
+}
+
+Function Add-NFSHomeDir {
+	Param (
+			[string]$username=$(Throw "Error: Please enter a username!"),
+			[string]$groupname="Domain Users"
+			[string]$nfspath="Domain Users"
+		)
+	Process	{
+    	Try	{
+    	}
+    }
+}
+
+
+-------------------
+$Computer = "eamono-ubuntu.cloudapp.net" 
+                 
+$SSHCred = Get-AutomationPSCredential -Name 'LinuxCredential' 
+$Connection = Get-AutomationConnection -Name 'LinuxConnection'                        
+$SSHKey = Get-AutomationVariable -Name 'SSHKey' 
+                 
+Invoke-SSHCommand -Connection $Connection -KeyString $SSHKey -ScriptBlock {ls /bin/touch} -Verbose 
+# or 
+Invoke-SSHCommand -Connection $Connection -ScriptBlock {ls /bin/sleep} -Verbose 
+# or 
+Invoke-SSHCommand -ComputerName $Computer -Credential $SSHCred -ScriptBlock {ls /bin/pwd} -Verbose 
+# or 
+Invoke-SSHCommand -ComputerName $Computer -Credential $SSHCred -KeyString $SSHKey -ScriptBlock {ls /bin/ping} -Verbose 
+--------------
+========================================================
+#ユーザー用フォルダの削除（バックアップディレクトリへの退避）スクリプト
+#LDAP Managerから、アカウント名、ユーザ種別を引数として実行する。(1ユーザごとに実行)
+###param($account,$user_type)
+###$list = import-csv $Userlist
+### $LM_Account_Name
+###   ログイン名
+### $LM_Group
+###   ADグループ名、寝屋川では不要だが、四條畷と合わせるため設定
+### $LM_HomeDir
+###   学生  ：\\mc2ed.osakac.ac.jp\Public\Profiles\[寝屋川ADグループ1]\[寝屋川Dグループ2]\[ログイン名]\Redirect\Home
+###   その他：\\mc2ed.osakac.ac.jp\Public\Profiles\[寝屋川ADグループ1]\[ログイン名]\Redirect\Home
+### $LM_Profile_Path (未使用)
+###   学生)   \\mc2ed.osakac.ac.jp\Public\Profiles\[寝屋川ADグループ1]\[寝屋川ADグループ2]\[ログイン名]\Profile
+###   その他) \\mc2ed.osakac.ac.jp\Public\Profiles\[寝屋川ADグループ1]\[ログイン名]\Profile
+### $LM_HomeDrive    (未使用)
+###    z:
+param($LM_Account_Name,$LM_Group,$LM_HomeDir,$LM_Profile_Path,$LM_HomeDrive)
+
+$ErrorActionPreference = 'Stop'
+
+#スクリプトの設置パスを取得
+$BASE_DIR=Split-Path -parent $MyInvocation.MyCommand.Path
+
+#ドメイン設定(固定)
+$DOMAIN='mc2ed'
+
+#ベースフォルダパス(固定)
+####$DIRBASE="\\mcfss\f$\share\home"
+
+#退避先ディレクトリパス
+####$BKUP_BASEDIR="\\mcfss\f$\home_backup"
+$BKUP_BASEDIR="\\mcfs01n\g$\profile_backup"
+
+#実行日時
+$DAY=Get-Date -Format 'yyyyMMdd'
+$TIME=Get-Date -Format 'HH:mm:ss'
+
+#ログ出力先設定
+$LOG_DIR=$BASE_DIR+'\Log'
+$LOG_FILE=$LOG_DIR+'\log_'+$DAY+'.log'
+
+#バックアップ対象ディレクトリ
+###$user_type_dir=$DIRBASE+"\"+$user_type
+###$target_dir=$DIRBASE+"\"+$user_type+"\"+$account
+$target_dir=Split-Path (($LM_Profile_Path -replace "mc2ed.osakac.ac.jp","mcfs01n") -replace "Public","g`$") -Parent
+$target_folder=Split-Path $target_dir -Leaf
+
+$bkup_user_type_dir=$BKUP_BASEDIR
+$bkup_target_dir=$BKUP_BASEDIR+"\"+$LM_Account_Name
+
+#出力メッセージ
+
+$SUCMSG_START=$TIME+': 処理を開始しました ->'+$target_dir
+$SUCMSG_FOLDER_MOVE=$TIME+': フォルダを退避しました ->'+$target_dir
+$SUCMSG_TIMESTAMP=$TIME+': タイムスタンプを更新しました -> '+$bkup_target_dir
+$SUCMSG_ALL=$TIME+': 処理が正常に完了しました -> '+$target_dir
+$ERRMSG_FOLDER_EXIST=$TIME+': 対象のフォルダが存在しないため、処理を停止します -> '+$target_dir
+$ERRMSG_BKUP_USER_FOLDER_EXIST=$TIME+': ユーザ種別に対応するフォルダがありません -> '+$bkup_user_type_dir
+$ERRMSG_BKUP_FOLDER_EXIST=$TIME+': 既に退避先にフォルダが存在します -> '+$bkup_target_dir
+$ERRMSG_TIMESTAMP=$TIME+': タイムスタンプ更新に失敗しました -> '+$bkup_target_dir
+$ERRMSG_FOLDER_MOVE=$TIME+': フォルダ退避に失敗しました -> '+$target_dir
+
+##MAIN
+
+$SUCMSG_START | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+
+#バックアップ対象のフォルダがない場合は処理を停止
+if((Test-Path $target_dir) -eq $false){
+  $ERRMSG_FOLDER_EXIST | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+  exit 1
+}
+
+#退避先のユーザ種別フォルダがない場合は処理を停止
+if((Test-Path $bkup_user_type_dir) -eq $false){
+  $ERRMSG_BKUP_USER_FOLDER_EXIST | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+  exit 1
+}
+
+#退避先に同名のユーザフォルダが存在する場合は処理を停止
+if((Test-Path $bkup_target_dir) -eq $true){
+  $ERRMSG_BKUP_FOLDER_EXIST | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+  exit 1
+}
+
+#フォルダ退避処理
+try{
+  Move-Item $target_dir -destination $bkup_target_dir
+}
+catch{
+  $ERRMSG_FOLDER_MOVE | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+  $error | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+  exit 1
+}
+$SUCMSG_FOLDER_MOVE | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+
+#タイムスタンプを現在の時刻にする (Linux の touch 相当)
+try{
+  $(Get-Item $bkup_target_dir).LastWriteTime = Get-Date
+}
+catch{
+  $ERRMSG_TIMESTAMP | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+  $error | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+  exit 1
+}
+$SUCMSG_TIMESTAMP | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+$SUCMSG_ALL | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+exit 0
