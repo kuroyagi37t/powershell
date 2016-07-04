@@ -1,0 +1,115 @@
+
+
+Import-Module ActiveDirectory
+
+
+##CSV読み込み
+$csvin=import-csv -Encoding UTF8 $csvfilepath 
+
+$csvin | foreach-object
+{
+	RT = AccountDuplicateCheck($_.ログイン名,$_.電子メールアドレス)
+	if (
+}
+
+
+$csvin | foreach-object{
+	$AccountList = @{
+		Path="OU="+$_.OU+",OU=user,"+$domain.distinguishedname
+		SamAccountName=$_.ログイン名
+		UserPrincipalName=$_.ログイン名 + "@" + $domain.DNSRoot
+		Name=$_.ログイン名
+		AccountPassword=Convertto-securestring -AsPlainText $_.パスワード -force
+		EmailAddress=$_.電子メールアドレス
+		SurName=$_.姓
+		GivenName=$_.名
+		DisplayName=$_.表示名
+	};
+}
+## 
+
+
+Function AccountDuplicatCheck {
+	Param($account,$email)
+	Process
+	{
+		#Check to see if the user already exists
+		$userFilterString = "samAccountName -like `"" + $AccountInfo['sAMAccountName'] + "`""
+		$user = Get-ADUser -Filter $userFilterString
+		#If user not already created, create them
+		if ($user -eq $null)
+		{
+			return 1
+		}
+
+		#Check to see if the Email already exists
+		$userFilterString = "email -eq $email "
+		$user = Get-ADUser -Filter $userFilterString
+		#If email not already created, create them
+		if ($user -eq $null)
+		{
+			return 2
+		}
+	}
+}
+
+
+Function PasswordPolicyCheck{
+	Param($password)
+	Process
+	{
+		#パスワードの長さチェック
+		if ($password.length -le $passpolicy.MinPasswordLength)
+		{
+		 	return 1
+		}
+		#複雑性のチェック
+		if($passpolicy.ComplexityEnabled -eq "True"){
+			if(($password -cmatch "[a-z]")+($password -cmatch "[A-Z]")+($password -cmatch "[0-9]")+($password -cmatch "[^0-9a-zA-Z]") -le 2) 
+			{
+			 	retrun 2
+			}
+		}
+	} 
+}
+
+#Create an Active Directory user
+Function CreateUser {
+	Param($AccountInfo)
+	Process {
+		try {
+			#Check to see if the user already exists
+			$userFilterString = "samAccountName -like `"" + $AccountInfo['sAMAccountName'] + "`""
+			$user = Get-ADUser -Filter $userFilterString
+			#If user not already created, create them
+			if ($user -eq $null) {
+				write-host "Creating user account:" $AccountInfo['sAMAccountName']
+				#Create the user account object
+				New-ADUser -SamAccountName $AccountInfo['sAMAccountName'] `
+						   -Name $AccountInfo['displayName'] `
+						   -DisplayName $AccountInfo['displayName'] `
+						   -GivenName $AccountInfo['givenName'] `
+						   -Surname $AccountInfo['sn'] `
+						   -Path $AccountInfo['ou'] `
+						   -ChangePasswordAtLogon $true `
+						   -AccountPassword (ConvertTo-SecureString $AccountInfo['password'] -AsPlainText -Force) `
+						   -Description $AccountInfo['description'] `
+						   -Enabled $false
+		   
+				#Set 'User must change password at next logon' to true after user has been created
+				#For some reason, the option wasn't set during New-ADUser - could be a bug?
+				$user = Get-ADUser -Filter $userFilterString
+				Set-ADUser $user -ChangePasswordAtLogon $true		  
+			}
+			else {
+				write-host "User" $AccountInfo['sAMAccountName'] "not created as it already exists" -ForegroundColor blue
+			}
+		}
+		catch
+		{
+			write-host "There was a problem creating the user" $AccountInfo['sAMAccountName'] "-" $_ -ForegroundColor red
+		}
+	}
+}
+
+
