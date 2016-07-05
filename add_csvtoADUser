@@ -1,73 +1,112 @@
-
-
 Import-Module ActiveDirectory
 
+## 前処理 (共通)
+$ErrorActionPreference = "Stop"
+$WarningPreference = "Continue"
+$VerbosePreference = "Continue"
+$DebugPreference = "Continue"
+
+##スクリプト共通変数
+[string]$Script:baseDir = Convert-Path $(Split-Path $MyInvocation.InvocationName -Parent)
+[string]$Script:psName = Split-Path $MyInvocation.InvocationName -Leaf
+[string]$Script:psBaseName = $psName -replace "\.ps1$", ""
+[string]$Script:timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+
+##スクリプト内共通エラーメッセージ
+[string]$Script:ERRMSG_AccDupChk_ACC_EXIST=$timestamp+': アカウント名が重複しています。'+$account
+[string]$Script:ERRMSG_AccDupChk_Email_EXIST=$timestamp+':eMailアドレスが重複しています。'+$email
+[string]$Script:ERRMSG_PwdChk_PwdLen_Short=$timestamp+': パスワードの長さが不足しています'+$account
+[string]$Script:ERRMSG_PwdChk_PwdPol_unmatch=$timestamp+':パスワードが複雑性(文字種が英小、英大、数字、記号のうち3つ)の要求を満たしていません。'+$account
+[string]$Script:ERRMSG_CreateUser_Err=$timestamp+':アカウントの登録に失敗しました。'+$account
+[string]$Script:ERRMSG_CSV_Chk_Err=$timestamp+':CSVの内容でエラーがあったため処理を中止します。'
+
+## スクリプト内変数
+[int]$local:SKIPCNT=0
+$local:PassPolicy = Get-ADDefaultDomainPasswordPolicy
+$local:MyDomain = Get-ADDomain
+
+. $baseDir\ExportLog.ps1
 
 ##CSV読み込み
-$csvin=import-csv -Encoding UTF8 $csvfilepath 
-
-$csvin | foreach-object
+$csvin = Import-Csv -Encoding UTF8 $csvfilepath 
+##CSVの内容チェック
+$csvin | Foreach-Object
 {
-	RT = AccountDuplicateCheck($_.ログイン名,$_.電子メールアドレス)
-	if (
+	AccountDuplicateCheck($_.ログイン名,$_.電子メールアドレス)
+    PasswordPolicyCheck($_.ログイン名,$_.パスワード)
 }
-
-
-$csvin | foreach-object{
-	$AccountList = @{
-		Path="OU="+$_.OU+",OU=user,"+$domain.distinguishedname
-		SamAccountName=$_.ログイン名
-		UserPrincipalName=$_.ログイン名 + "@" + $domain.DNSRoot
-		Name=$_.ログイン名
-		AccountPassword=Convertto-securestring -AsPlainText $_.パスワード -force
-		EmailAddress=$_.電子メールアドレス
-		SurName=$_.姓
-		GivenName=$_.名
-		DisplayName=$_.表示名
-	};
+if ($SKIPCNT -eq 0)
+{
+    $csvin | Foreach-Object{
+    	$AccountList = @{
+    		Path="OU="+$_.OU+",OU=user,"+$MyDomain.distinguishedname
+	    	sAMAccountName=$_.ログイン名
+		    UPN=$_.ログイン名 + "@" + $MyDomain.DNSRoot
+    		Name=$_.ログイン名
+	    	Password=ConvertTo-SecureString -AsPlainText $_.パスワード -Force
+		    EmailAddress=$_.電子メールアドレス
+    		sn=$_.姓
+	    	GivenName=$_.名
+		    DisplayName=$_.表示名
+            Description="Office365連携用アカウント"
+	    };
+        CreateUser ($AccountList)
+    }
+}
+else {
+    Write-SkipLog ERRMSG_CSV_Chk_Err
 }
 ## 
 
-
 Function AccountDuplicatCheck {
+	[OutputType([String])]
+	[CmdletBinding()]
 	Param($account,$email)
 	Process
 	{
 		#Check to see if the user already exists
-		$userFilterString = "samAccountName -like `"" + $AccountInfo['sAMAccountName'] + "`""
+		$userFilterString = "samAccountName -like `"" + $account + "`""
 		$user = Get-ADUser -Filter $userFilterString
 		#If user not already created, create them
-		if ($user -eq $null)
-		{
-			return 1
-		}
-
+		if ($user -ne $null) 
+        {
+            Write-SkipLog $ERRMSG_AccDupChk_ACC_EXIST
+            ++$SKIPCNT
+            return 1
+        }
 		#Check to see if the Email already exists
 		$userFilterString = "email -eq $email "
 		$user = Get-ADUser -Filter $userFilterString
 		#If email not already created, create them
-		if ($user -eq $null)
+		if ($user -ne $null)
 		{
+            Write-SkipLog $ERRMSG_AccDupChk_EMail_EXIST
+            ++$SKIPCNT
 			return 2
+
 		}
+        return 0
 	}
 }
 
-
 Function PasswordPolicyCheck{
-	Param($password)
+	[OutputType([String])]
+	[CmdletBinding()]
+	Param($account,$password)
 	Process
 	{
 		#パスワードの長さチェック
 		if ($password.length -le $passpolicy.MinPasswordLength)
 		{
-		 	return 1
+            Write-SkipLog $ERRMSG_PwdChk_PwdLen_Short
+            ++$SKIPCNT
 		}
 		#複雑性のチェック
 		if($passpolicy.ComplexityEnabled -eq "True"){
 			if(($password -cmatch "[a-z]")+($password -cmatch "[A-Z]")+($password -cmatch "[0-9]")+($password -cmatch "[^0-9a-zA-Z]") -le 2) 
 			{
-			 	retrun 2
+                Write-SkipLog $ERRMSG_PwdChk_PwdPol_unmatch
+                ++$SKIPCNT
 			}
 		}
 	} 
@@ -75,6 +114,8 @@ Function PasswordPolicyCheck{
 
 #Create an Active Directory user
 Function CreateUser {
+	[OutputType([String])]
+	[CmdletBinding()]
 	Param($AccountInfo)
 	Process {
 		try {
@@ -90,26 +131,60 @@ Function CreateUser {
 						   -DisplayName $AccountInfo['displayName'] `
 						   -GivenName $AccountInfo['givenName'] `
 						   -Surname $AccountInfo['sn'] `
+                           -UserPrincipalName $AccountInfo['UPN'] `
+                           -EmailAddress $AccountInfo['EMailAddress'] `
 						   -Path $AccountInfo['ou'] `
-						   -ChangePasswordAtLogon $true `
 						   -AccountPassword (ConvertTo-SecureString $AccountInfo['password'] -AsPlainText -Force) `
-						   -Description $AccountInfo['description'] `
-						   -Enabled $false
-		   
+						   -Description $AccountInfo['description'] 		   
+                if ($? -eq $false ) {
+                    Write-SkipLog $ERRMSG_CreateUser_Err
+                }
 				#Set 'User must change password at next logon' to true after user has been created
 				#For some reason, the option wasn't set during New-ADUser - could be a bug?
-				$user = Get-ADUser -Filter $userFilterString
-				Set-ADUser $user -ChangePasswordAtLogon $true		  
+
 			}
 			else {
-				write-host "User" $AccountInfo['sAMAccountName'] "not created as it already exists" -ForegroundColor blue
+                Write-SkipLog $ERRMSG_AccDupChk_ACC_EXIST
 			}
 		}
 		catch
 		{
-			write-host "There was a problem creating the user" $AccountInfo['sAMAccountName'] "-" $_ -ForegroundColor red
+            Write-SkipLog $ERRMSG_CreateUser_Err
 		}
 	}
 }
 
+function Rename-File{
+	[OutputType([String])]
+	[CmdletBinding()]
+    Param(
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$FilePath,
+        [Parameter(Mandatory=$True,Position = 1)]
+        [String]$NewFileName
+    )
+    Process {
+        if(Test-Path -LiteralPath $FilePath -PathType Leaf){
+            $newFilePath = Join-Path -Path (Split-Path $FilePath -Parent) -ChildPath $NewFileName
+            Move-Item -LiteralPath $FilePath -Destination $newFilePath
+        }
+        else {
+            Write-SkipLog $ERRMSG_RenFile_File_NOT_EXIST+$FilePath
+        }
+    }
+}
 
+
+Function Set_ADPasswordSync {
+    $adConnector = "<CASE SENSITIVE AD CONNECTOR NAME>"
+    $aadConnector = "<CASE SENSITIVE AAD CONNECTOR NAME>"
+    Import-Module adsync
+    $c = Get-ADSyncConnector -Name $adConnector
+    $p = New-Object Microsoft.IdentityManagement.PowerShell.ObjectModel.ConfigurationParameter “Microsoft.Synchronize.ForceFullPasswordSync”, String, ConnectorGlobal, $null, $null, $null
+    $p.Value = 1
+    $c.GlobalParameters.Remove($p.Name)
+    $c.GlobalParameters.Add($p)
+    $c = Add-ADSyncConnector -Connector $c
+    Set-ADSyncAADPasswordSyncConfiguration -SourceConnector $adConnector -TargetConnector $aadConnector -Enable $false
+    Set-ADSyncAADPasswordSyncConfiguration -SourceConnector $adConnector -TargetConnector $aadConnector -Enable $true
+}
