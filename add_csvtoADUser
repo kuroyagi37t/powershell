@@ -12,31 +12,44 @@ $DebugPreference = "Continue"
 [string]$Script:psBaseName = $psName -replace "\.ps1$", ""
 [string]$Script:timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 
+
 ##スクリプト内共通エラーメッセージ
+[string]$Script:ERRMSG_AD_Error=$timestamp+': ADサーバと接続できません。'+$account
+[string]$Script:ERRMSG_CSV_Not_EXIST=$timestamp+': CSVファイルがありません。'+$account
 [string]$Script:ERRMSG_AccDupChk_ACC_EXIST=$timestamp+': アカウント名が重複しています。'+$account
+[string]$Script:ERRMSG_AccDupChk_ACC_Char_Err=$timestamp+': アカウント名がOffice365の使用でるきる文字の制限を満たしていません。'+$account
+[string]$Script:ERRMSG_AccDupChk_ACC_Long=$timestamp+': アカウント名がOffice365の制限(48文字以内)を満たしていません。'+$account
 [string]$Script:ERRMSG_AccDupChk_Email_EXIST=$timestamp+':eMailアドレスが重複しています。'+$email
+[string]$Script:ERRMSG_PwdChk_PwdLen_o365_Err=$timestamp+': パスワードの長さがOffice365の制限より不足しています'+$account
 [string]$Script:ERRMSG_PwdChk_PwdLen_Short=$timestamp+': パスワードの長さが不足しています'+$account
 [string]$Script:ERRMSG_PwdChk_PwdPol_unmatch=$timestamp+':パスワードが複雑性(文字種が英小、英大、数字、記号のうち3つ)の要求を満たしていません。'+$account
 [string]$Script:ERRMSG_CreateUser_Err=$timestamp+':アカウントの登録に失敗しました。'+$account
 [string]$Script:ERRMSG_CSV_Chk_Err=$timestamp+':CSVの内容でエラーがあったため処理を中止します。'
 
-## スクリプト内変数
-[int]$local:SKIPCNT=0
-$local:PassPolicy = Get-ADDefaultDomainPasswordPolicy
-$local:MyDomain = Get-ADDomain
-
+##共通モジュール読み込み
 . $baseDir\ExportLog.ps1
 
+## スクリプト内変数
+[int]$local:SKIPCNT=0
+try {
+    $local:PassPolicy = Get-ADDefaultDomainPasswordPolicy -ErrorAction Stop
+    $local:MyDomain = Get-ADDomain -ErrorAction Stop
+}
+catch {
+    Write-SkipLog $ERRMSG_AD_Error
+    Exit 1 
+}
+
+
 ##CSV読み込み
+
 $csvin = Import-Csv -Encoding UTF8 $csvfilepath 
 ##CSVの内容チェック
-$csvin | Foreach-Object
-{
-	AccountDuplicateCheck($_.ログイン名,$_.電子メールアドレス)
-    PasswordPolicyCheck($_.ログイン名,$_.パスワード)
+$csvin | Foreach-Object {
+	Check-Account($_.ログイン名,$_.電子メールアドレス)
+    Check-PasswordPolicy($_.ログイン名,$_.パスワード)
 }
-if ($SKIPCNT -eq 0)
-{
+if ($SKIPCNT -eq 0) {
     $csvin | Foreach-Object{
     	$AccountList = @{
     		Path="OU="+$_.OU+",OU=user,"+$MyDomain.distinguishedname
@@ -50,26 +63,25 @@ if ($SKIPCNT -eq 0)
 		    DisplayName=$_.表示名
             Description="Office365連携用アカウント"
 	    };
-        CreateUser ($AccountList)
+        Create-ADUser ($AccountList)
     }
 }
 else {
     Write-SkipLog ERRMSG_CSV_Chk_Err
 }
-## 
-
-Function AccountDuplicatCheck {
+##
+## アカウント重複チェック処理 
+##
+Function Check-Account {
 	[OutputType([String])]
 	[CmdletBinding()]
 	Param($account,$email)
-	Process
-	{
+	Process {
 		#Check to see if the user already exists
 		$userFilterString = "samAccountName -like `"" + $account + "`""
 		$user = Get-ADUser -Filter $userFilterString
 		#If user not already created, create them
-		if ($user -ne $null) 
-        {
+		if ($user -ne $null) {
             Write-SkipLog $ERRMSG_AccDupChk_ACC_EXIST
             ++$SKIPCNT
             return 1
@@ -78,33 +90,39 @@ Function AccountDuplicatCheck {
 		$userFilterString = "email -eq $email "
 		$user = Get-ADUser -Filter $userFilterString
 		#If email not already created, create them
-		if ($user -ne $null)
-		{
+		if ($user -ne $null) {
             Write-SkipLog $ERRMSG_AccDupChk_EMail_EXIST
             ++$SKIPCNT
 			return 2
-
 		}
         return 0
 	}
 }
-
-Function PasswordPolicyCheck{
+##
+## パスワードポリシーチェック処理 
+##
+##  英小文字、英大文字、数字、記号 @ # $ % ^ & * – _ + = [ ] { } | \ : ‘' , . ? / ` ~ “ < > ( ) ;
+Function Check-Password{
 	[OutputType([String])]
 	[CmdletBinding()]
 	Param($account,$password)
-	Process
-	{
-		#パスワードの長さチェック
-		if ($password.length -le $passpolicy.MinPasswordLength)
-		{
+	Process {
+		#パスワードの長さチェック o365のポリシー
+		if ($password.length -le $passpolicy.MinPasswordLength) {
             Write-SkipLog $ERRMSG_PwdChk_PwdLen_Short
             ++$SKIPCNT
 		}
-		#複雑性のチェック
-		if($passpolicy.ComplexityEnabled -eq "True"){
-			if(($password -cmatch "[a-z]")+($password -cmatch "[A-Z]")+($password -cmatch "[0-9]")+($password -cmatch "[^0-9a-zA-Z]") -le 2) 
-			{
+		#パスワードの長さチェック ADのポリシー
+		if ($password.length -le $passpolicy.MinPasswordLength) {
+            Write-SkipLog $ERRMSG_PwdChk_PwdLen_Short
+            ++$SKIPCNT
+		}
+		#複雑性のチェック 2種類以下の場合はNG
+		if($passpolicy.ComplexityEnabled -eq "True") {
+			if(($password -cmatch "[a-z]")+ `
+               ($password -cmatch "[A-Z]")+ `
+               ($password -cmatch "[0-9]")+ `
+               ($password -cmatch "[@#$%^&*-_+=\[\]{}|\\:',.?/`~<>()]") -le 2) {
                 Write-SkipLog $ERRMSG_PwdChk_PwdPol_unmatch
                 ++$SKIPCNT
 			}
@@ -113,7 +131,7 @@ Function PasswordPolicyCheck{
 }
 
 #Create an Active Directory user
-Function CreateUser {
+Function Create-ADUser {
 	[OutputType([String])]
 	[CmdletBinding()]
 	Param($AccountInfo)
@@ -147,8 +165,7 @@ Function CreateUser {
                 Write-SkipLog $ERRMSG_AccDupChk_ACC_EXIST
 			}
 		}
-		catch
-		{
+		catch {
             Write-SkipLog $ERRMSG_CreateUser_Err
 		}
 	}
