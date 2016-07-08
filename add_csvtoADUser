@@ -1,184 +1,276 @@
 Import-Module ActiveDirectory
 
-## 前処理 (共通)
+## 共通  エラーアクション設定
 $ErrorActionPreference = "Stop"
 $WarningPreference = "Continue"
 $VerbosePreference = "Continue"
 $DebugPreference = "Continue"
 
 ##スクリプト共通変数
-[string]$Script:baseDir = Convert-Path $(Split-Path $MyInvocation.InvocationName -Parent)
-[string]$Script:psName = Split-Path $MyInvocation.InvocationName -Leaf
-[string]$Script:psBaseName = $psName -replace "\.ps1$", ""
-[string]$Script:timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+[String]$Script:baseDir = Convert-Path $(Split-Path $MyInvocation.InvocationName -Parent)
+[String]$Script:psName = Split-Path $MyInvocation.InvocationName -Leaf
+[String]$Script:psBaseName = $psName -replace "\.ps1$", ""
+[String]$Script:timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
 
+## 環境設定用変数
+[String]$csv_encode = "UTF8"          #入力用CSVファイルの文字コード　UTF8 or sjis  
+[String]$CSV_HeadStr="OU,ログイン名,パスワード,電子メールアドレス,姓,名,表示名"            ## CSV用ヘッダー
+[String]$CSVfile="c:\scripts\useradd\data\input.csv"                                ##　入力用CSVファイル       
+                
+[String]$global:sLogPath=$basedir+"\logs\"                ## Log出力用
+[String]$global:DataPath=$basedir+"\data\"                ## InputData用
+[String]$global:DataOldPath=$basedir+"\data\old"          ## InputData退避用  
+[String]$global:sDate=$timestamp
 
 ##スクリプト内共通エラーメッセージ
-[string]$Script:ERRMSG_AD_Error=$timestamp+': ADサーバと接続できません。'+$account
-[string]$Script:ERRMSG_CSV_Not_EXIST=$timestamp+': CSVファイルがありません。'+$account
-[string]$Script:ERRMSG_AccDupChk_ACC_EXIST=$timestamp+': アカウント名が重複しています。'+$account
-[string]$Script:ERRMSG_AccDupChk_ACC_Char_Err=$timestamp+': アカウント名がOffice365の使用でるきる文字の制限を満たしていません。'+$account
-[string]$Script:ERRMSG_AccDupChk_ACC_Long=$timestamp+': アカウント名がOffice365の制限(48文字以内)を満たしていません。'+$account
-[string]$Script:ERRMSG_AccDupChk_Email_EXIST=$timestamp+':eMailアドレスが重複しています。'+$email
-[string]$Script:ERRMSG_PwdChk_PwdLen_o365_Err=$timestamp+': パスワードの長さがOffice365の制限より不足しています'+$account
-[string]$Script:ERRMSG_PwdChk_PwdLen_Short=$timestamp+': パスワードの長さが不足しています'+$account
-[string]$Script:ERRMSG_PwdChk_PwdPol_unmatch=$timestamp+':パスワードが複雑性(文字種が英小、英大、数字、記号のうち3つ)の要求を満たしていません。'+$account
-[string]$Script:ERRMSG_CreateUser_Err=$timestamp+':アカウントの登録に失敗しました。'+$account
-[string]$Script:ERRMSG_CSV_Chk_Err=$timestamp+':CSVの内容でエラーがあったため処理を中止します。'
-[string]$global:csvfilepath="c:\scripts\useradd\data\input.csv"
-[string]$global:sLogPath=$basedir+"\logs\"
-[string]$global:sDate=$timestamp
-
-$CSV_HeadStr="OU,ログイン名,パスワード,電子メールアドレス,姓,名,表示名"
-$CSV_Header = $CSV_HeadStr -split ","
-
+[String]$Script:ERRMSG_AD_Error=$timestamp+': ADサーバと接続できません。'
+[String]$Script:ERRMSG_CSV_Not_EXIST=$timestamp+': CSVファイルがありません。->'
+[String]$Script:ERRMSG_AccDupChk_ACC_EXIST=$timestamp+': アカウント名が重複しています。->'
+[String]$Script:ERRMSG_AccDupChk_ACC_Char_Err=$timestamp+': アカウント名がOffice365の使用でるきる文字の制限を満たしていません。->'
+[String]$Script:ERRMSG_AccDupChk_ACC_Long=$timestamp+': アカウント名がOffice365の制限(48文字以内)を満たしていません。->'
+[String]$Script:ERRMSG_AccDupChk_Email_EXIST=$timestamp+':eMailアドレスが重複しています。->'
+[String]$Script:ERRMSG_PwdChk_PwdLen_o365_Err=$timestamp+': パスワードの長さがOffice365の制限より不足しています。->'
+[String]$Script:ERRMSG_PwdChk_PwdLen_Short=$timestamp+': パスワードの長さが不足しています。->'
+[String]$Script:ERRMSG_PwdChk_PwdPol_unmatch=$timestamp+':パスワードが複雑性(文字種が英小、英大、数字、記号のうち3つ)の要求を満たしていません。->'
+[String]$Script:ERRMSG_CreateUser_Err=$timestamp+':アカウントの登録に失敗しました。->'
+[String]$Script:ERRMSG_CSV_Chk_Err=$timestamp+':CSVの内容でエラーがあったため処理を中止します。'
+[String]$Script:ERRMSG_File_Not_EXIST=$timestamp+':ファイルおよびパスが存在しません。->'
+[String]$Script:ERRMSG_File_Already_EXIST=$timestamp+':ファイルが既に存在します。->'
 
 ##共通モジュール読み込み
 .$baseDir\ExportLog.ps1
 
-
 ##
 ## ADアカウント重複チェック処理 
 ##
-Function Check-Account {
+Function Check-Account 
+{
 	[OutputType([String])]
 	[CmdletBinding()]
-	Param($account,$email)
-	Process {
+	Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$Account,
+        [Parameter(Mandatory=$True,Position = 1)]
+        [String]$Email
+    )
+
+    Begin 
+    {
+        [int]$Private:SkipCnt=0
+    }
+
+	Process 
+    {
 		#Check to see if the user already exists
-		$userFilterString = "samAccountName -eq `"" + $account + "`""
+		$userFilterString = "samAccountName -eq `"" + $Account + "`""
         echo $userFilterString
-		$user = Get-ADUser -Filter $userFilterString
+		$rt = Get-ADUser -Filter $userFilterString
 		#If user not already created, create them
-		if ($user -ne $null) {
+		if ($rt -ne $null) 
+        {
             Write-SkipLog $ERRMSG_AccDupChk_ACC_EXIST$account
-            ++$SKIPCNT
-#            return 1
+            ++$SkipCnt
         }
 		#Check to see if the Email already exists
 		$userFilterString = "mail -eq `"" + $email + "`""
-		$user = Get-ADUser -Filter $userFilterString
+		$rt = Get-ADUser -Filter $userFilterString
 		#If email not already created, create them
-		if ($user -ne $null) {
+		if ($rt -ne $null) 
+        {
             Write-SkipLog $ERRMSG_AccDupChk_EMail_EXIST$email
-            ++$SKIPCNT
-			return 2
+            ++$SkipCnt
 		}
-        return 0
+        return $SkipCnt
 	}
 }
 ##
 ## パスワードポリシーチェック処理 
-##
-##  英小文字、英大文字、数字、記号 @ # $ % ^ & * ? _ + = [ ] { } | \ : ‘' , . ? / ` ~ “ < > ( ) ;
-Function Check-PasswordPolicy{
+##　 英小文字、英大文字、数字、記号 @ # $ % ^ & * ? _ + = [ ] { } | \ : ‘' , . ? / ` ~ “ < > ( ) ;
+Function Check-PasswordPolicy
+{
 	[OutputType([String])]
 	[CmdletBinding()]
-	Param($account,$password)
-	Process {
+	Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$Account,
+        [Parameter(Mandatory=$True,Position = 1)]
+        [String]$Password
+    )
+    Begin 
+    {
+        [int]$Private:SkipCnt=0
+    }
+	Process 
+    {
 		#パスワードの長さチェック o365のポリシー
-		if ($password.length -le $passpolicy.MinPasswordLength) {
-		Write-SkipLog $ERRMSG_PwdChk_PwdLen_Short$account"文字数："$password.length
-            ++$SKIPCNT
+		if ($Password.length -le $passpolicy.MinPasswordLength) 
+        {
+    		Write-SkipLog $ERRMSG_PwdChk_PwdLen_Short$account"文字数："$Password.length
+            ++$SKipCnt
 		}
 		#パスワードの長さチェック ADのポリシー
-		if ($password.length -le $passpolicy.MinPasswordLength) {
-		Write-SkipLog $ERRMSG_PwdChk_PwdLen_Short$account+"文字数："$password.length
-            ++$SKIPCNT
+		if ($Password.length -le $passpolicy.MinPasswordLength) 
+        {
+    		Write-SkipLog $ERRMSG_PwdChk_PwdLen_Short$account"文字数："$Password.length
+            ++$SkipCnt
 		}
+        #パスワード使用不可文字のチェック o365制限 ※空白とかはNG
+        if (-not($Password -cmatch "^[a-zA-Z0-9@#$%^&*-_+=\[\]{}|\\:',.?/`~<>()]*$"))
+        {
+            Write-SkipLog $ERRMSG_PwdChk_PwdLen_Short$account"文字数："$Password.length
+            ++$SKipCnt
+        }
 		#複雑性のチェック 2種類以下の場合はNG
-		if($passpolicy.ComplexityEnabled -eq "True") {
-			if(($password -cmatch "[a-z]")+($password -cmatch "[A-Z]")+($password -cmatch "[0-9]")+($password -cmatch "[@#$%^&*-_+=\[\]{}|\\:',.?/`~<>()]") -le 2) {
-                Write-SkipLog $ERRMSG_PwdChk_PwdPol_unmatch+$account
-                ++$SKIPCNT
+		if($passpolicy.ComplexityEnabled -eq "True") 
+        {
+			if(($Password -cmatch "[a-z]")+($Password -cmatch "[A-Z]")+($Password -cmatch "[0-9]")+($Password -cmatch "[@#$%^&*-_+=\[\]{}|\\:',.?/`~<>()]") -le 2) 
+            {
+                Write-SkipLog $ERRMSG_PwdChk_PwdPol_unmatch$account
+                ++$SkipCnt
 			}
 		}
+        return $SkipCnt
 	} 
 }
 
-#Create an Active Directory user
-Function Create-ADUser {
+## Active Directory ユーザー　新規作成
+Function Create-ADUser 
+{
 	[OutputType([String])]
 	[CmdletBinding()]
-	Param($AccountInfo)
-	Process {
-		try {
+	Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        $AccountInfo
+    )
+    Process 
+    {
+		try 
+        {
 			#Check to see if the user already exists
 			$userFilterString = "samAccountName -like `"" + $AccountInfo['sAMAccountName'] + "`""
 			$user = Get-ADUser -Filter $userFilterString
 			#If user not already created, create them
-			if ($user -eq $null) {
+			if ($user -eq $null) 
+            {
 				write-host "Creating user account:" $AccountInfo['sAMAccountName']
 				#Create the user account object
                 New-ADUser	-SamAccountName $AccountInfo['sAMAccountName'] `
-				-Name $AccountInfo['displayName'] `
-				-DisplayName $AccountInfo['displayName'] `
-				-GivenName $AccountInfo['givenName'] `
-				-Surname $AccountInfo['sn'] `
-				-UserPrincipalName $AccountInfo['UPN'] `
-				-EmailAddress $AccountInfo['EMailAddress'] `
-				-Path $AccountInfo['Path'] `
-				-AccountPassword (ConvertTo-SecureString $AccountInfo['password'] -AsPlainText -Force) `
-				-Description $AccountInfo['description'] `
-				-Enabled $True
-                if ($? -eq $false ) {
+				            -Name $AccountInfo['displayName'] `
+				            -DisplayName $AccountInfo['displayName'] `
+				            -GivenName $AccountInfo['givenName'] `
+				            -Surname $AccountInfo['sn'] `
+				            -UserPrincipalName $AccountInfo['UPN'] `
+				            -EmailAddress $AccountInfo['EMailAddress'] `
+				            -Path $AccountInfo['Path'] `
+				            -AccountPassword (ConvertTo-SecureString $AccountInfo['password'] -AsPlainText -Force) `
+				            -Description $AccountInfo['description'] `
+                            -Pager 1
+				            -Enabled $True
+                if ($? -eq $false ) 
+                {
                     Write-SkipLog $ERRMSG_CreateUser_Err
                 }
 				#Set 'User must change password at next logon' to true after user has been created
 				#For some reason, the option wasn't set during New-ADUser - could be a bug?
 			}
-			else {
+			else 
+            {
                 Write-SkipLog $ERRMSG_AccDupChk_ACC_EXIST
 			}
 		}
-		catch {
+		catch 
+        {
             Write-SkipLog $ERRMSG_CreateUser_Err
 		}
 	}
 }
 
-function Rename-File{
+Function Rename-File
+{
 	[OutputType([String])]
 	[CmdletBinding()]
-    Param(
+    Param
+    (
         [Parameter(Mandatory=$True,Position = 0)]
         [String]$FilePath,
         [Parameter(Mandatory=$True,Position = 1)]
         [String]$NewFileName
     )
-    Process {
-        if(Test-Path -LiteralPath $FilePath -PathType Leaf){
+    Process 
+    {
+        if(Test-Path -LiteralPath $FilePath -PathType Leaf)
+        {
             $newFilePath = Join-Path -Path (Split-Path $FilePath -Parent) -ChildPath $NewFileName
             Move-Item -LiteralPath $FilePath -Destination $newFilePath
         }
-        else {
+        else 
+        {
             Write-SkipLog $ERRMSG_RenFile_File_NOT_EXIST+$FilePath
         }
     }
 }
 
-## スクリプト内変数
-[int]$global:SKIPCNT=0
-try {
+Function Check-Path
+{
+    ForEach ($cpath in $args)
+    {
+        if (-not (Test-Path -Path $cpath))
+        {
+            Write-ErrorLog $ERRMSG_File_Not_EXIST$cpath
+        }
+    }    
+}
+
+Function Check-Exist-Path
+{
+    ForEach ($cpath in $args)
+    {
+        if (Test-Path -Path $cpath)
+        {
+            Write-ErrorLog $ERRMSG_File_Already_EXIST$cpath
+        }
+    }    
+}
+
+##
+##  Main
+##
+## AD情報取得
+try 
+{
     $local:PassPolicy = Get-ADDefaultDomainPasswordPolicy -ErrorAction Stop
     $local:MyDomain = Get-ADDomain -ErrorAction Stop
 }
-catch {
+catch 
+{
     Write-SkipLog $ERRMSG_AD_Error
     Exit 1 
 }
 
-##CSV読み込み
+## ファイル存在チェック
+Check-Path $csvfile,$sLogPath,$DataPath,$DataOldPath
+$csvfile_Bkup=$DataOldPath+(Split-Path -Leaf $csvfile).replace(".csv","_"+$timestamp+".csv")
+Check-Exist-Path $csvfile_Bkup
 
 ##$csvdata = Import-Csv -Encoding UTF8 $csvfilepath 
-$csvdata = Get-Content $csvfilepath |Select-Object -Skip 1 | ConvertFrom-Csv -Header $CSV_Header
+## CSV ヘッダー行(1行目Skip)
+###$csvdata = Get-Content $csvfile |Select-Object -Skip 1  |ConvertFrom-Csv -Header $CSV_Header
+## CSV読み込み
+$CSV_Header = $CSV_HeadStr -split ","
+$csvdata = Get-Content $csvfile |Select-Object -Skip 1 | ? {$_.trim() -ne "" } |ConvertFrom-Csv -Header $CSV_Header
 ##CSVの内容チェック
-$csvdata |ForEach-Object  {
+$csvdata |ForEach-Object  
+{
 	Check-Account $_.ログイン名 $_.電子メールアドレス
     Check-PasswordPolicy $_.ログイン名 $_.パスワード
 }
-if ($SKIPCNT -eq 0) {
-    $csvdata | foreach {
+if ($SKIPCNT -eq 0) 
+{
+    $csvdata | foreach 
+    {
     	$AccountList = @{
     		Path="OU="+$_.OU+",OU=user,"+$MyDomain.distinguishedname
 	    	sAMAccountName=$_.ログイン名
@@ -194,12 +286,14 @@ if ($SKIPCNT -eq 0) {
         Create-ADUser $AccountList
     }
 }
-else {
+else 
+{
     Write-SkipLog ERRMSG_CSV_Chk_Err
 }
 
 
-Function Set_ADPasswordSync {
+Function Set_ADPasswordSync 
+{
     $adConnector = "<CASE SENSITIVE AD CONNECTOR NAME>"
     $aadConnector = "<CASE SENSITIVE AAD CONNECTOR NAME>"
     Import-Module adsync
