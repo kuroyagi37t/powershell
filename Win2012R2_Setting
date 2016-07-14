@@ -1,0 +1,372 @@
+###設定
+#RDP
+$Logs=@("Application","Security","System")
+$Disable_Services="spooler"
+[String]$DVD_Drive_Letter="Q:"
+[Int]$StartupDelayTimeOut=5
+#Local_Admin_UserName=""
+#Local_Admin_Pass=""
+[String]$RDP_PortNumber="3389"
+###プロキシ情報
+# プロキシサーバ
+[String]$Proxy_URL = "http://proxy.iiji.jp:8080"
+# プロキシ認証アカウント
+[String]$Proxy_user = ""
+[String]$Proxy_pass = ""
+$BGInfoURL="https://download.sysinternals.com/files/BGInfo.zip"
+$BGInfoInstallPath="c:\work\iij"
+
+Function Set-AdminPass-Expires
+{
+#　ローカルAdministratorアカウントのパスワード無期限設定
+	wmic useraccount where "Name='administrator'" set PasswordExpires=FALSE
+}
+
+Function Set-VolumeLabel
+{
+    Param(
+        [String]$d,
+        [String]$l
+    )
+# Volumeのラベル設定
+	Set-Volume -DriveLetter $d -NewFileSystemLabel $l
+}
+Function Set-DVD_DriveLetter
+{
+    Param(
+        [String]$New_DriveLetter
+    )
+# 光学ドライブのドライブレター変更
+	$d = Get-WmiObject -Class win32_volume -Filter "DriveType = 5"
+	Set-WmiInstance -InputObject $d -Arguments @{DriveLetter=$New_DriveLetter}
+}
+
+Function Set-startup-delay-time
+{
+    Param(
+        [Int]$timeout
+    )
+    bcdedit /timeout $timeout |Out-Null
+    bcdedit
+}
+
+Function Set-Windows-Error-Report-Option 
+{
+### Windows エラーリポートを無効化する。
+	c:\windows\system32\ServerWerOptin.exe /disable
+    Get-Windows-Error-Report-Option 
+}
+Function Get-Windows-Error-Report-Option 
+{
+### Windows エラーリポートを無効化する。
+	$SWO=c:\windows\system32\ServerWerOptin.exe /query |Select -first 3 |select -last 1
+	Write-Host `t`t`tWindowsエラー報告`t`t`t`t$SWO
+}
+Function Set-Ceip-Option 
+{
+### カスタマーエクスペリエンスを無効化する。
+	c:\windows\system32\ServerCeipOptin.exe /disable
+    Get-Ceip-Option 
+}
+Function Get-Ceip-Option 
+{
+### カスタマーエクスペリエンスを確認する。
+	$SCO=c:\windows\system32\ServerCeipOptin.exe /query |Select -first 3 | Select -last 1
+   	Write-Host `t`t`tカスタマーエクスペリエンス参加状態`t`t`t`t$SCO
+}
+Function Get-EventLog-Setting
+{
+    Get-Eventlog -list 
+}
+Function Set-EventLog-Size
+{
+    Param(
+        $p
+    )
+### イベントログサイズを変更する
+###   最大ログ サイズ　20480 KB(20MB) → 262144 KB（256 MB)
+###   イベント ログが最大値に達したときイベントを上書きしないでログをアーカイブする
+	foreach ($l in $p)
+	{
+		Limit-EventLog -logname $l -maximumsize 256mb -overflowaction donotoverwrite
+        Set-Reg $(join-path "HKLM:\SYSTEM\CurrentControlSet\services\eventlog\" $l)  "AutoBackupLogFiles" "DWORD" "1" |Out-null
+        Set-Reg $(join-path "HKLM:\SYSTEM\CurrentControlSet\services\eventlog\" $l) "Retention" "DWORD" "4294967295" |Out-Null
+	}
+    Get-EventLog-Setting
+}
+Function Get-IPv6-PrefixPolicy
+{
+    netsh interface ipv6 show prefixpolicies
+}
+Function Set-IPv6-PrefixPolicy
+{
+    netsh interface ipv6 set prefixpolicy ::ffff:0:0/96 50 0 |Out-Null
+    netsh interface ipv6 set prefixpolicy ::1/128 40 1|Out-Null
+    netsh interface ipv6 set prefixpolicy ::/0 30 2|Out-Null
+    netsh interface ipv6 set prefixpolicy 2002::/16 20 3|Out-Null
+    netsh interface ipv6 set prefixpolicy ::/96 10 4|Out-Null
+    Get-IPv6-PrefixPolicy
+}
+
+Function Set-Powercfg-High
+{
+	$PGUID = powercfg /L|findstr "高パフォーマンス" | % {$_.Split(" ")[2]}
+	powercfg /S $PGUID
+    Get-Powercfg
+}
+Function Get-Powercfg
+{
+	powercfg /L
+}
+
+Function Set-Windowsupdate-Disable
+{
+	Set-Reg "HKLM:SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update" "AUOptions" "DWORD"  "1"   ### WindowsUpdate を無効化する
+}
+Function Set-AutoSize-Pagefile
+{
+    Param(
+        [boolean]$autosizepage
+    )
+    Process {
+    	if ($autosizepage) 
+	    {
+		    write-host "disable pagefile automanage"
+		    wmic computersystem set AutomaticManagedPagefile=true
+	    }
+	    else
+        {
+    		write-host "Determining system RAM and setting pagefile..."
+		    $RAM = Get-WmiObject -Class Win32_OperatingSystem | Select TotalVisibleMemorySize
+		    $RAM = ($RAM.TotalVisibleMemorySize / 1kb).tostring("F00")
+		    write-host "disable pagefile automanage"
+		    wmic computersystem set AutomaticManagedPagefile=False
+		    Write-Host "removing old pagefile"
+		    wmic pagefileset delete
+		    write-host "creating new pagefile on C:\"
+		    wmic pagefileset create name=“c:\pagefile.sys”
+		    write-host "set size"
+		    $PageFile = Get-WmiObject -Class Win32_PageFileSetting
+		    $PageFile.InitialSize = [Int]$RAM+257
+		    $PageFile.MaximumSize = [Int]$RAM+257
+		    [void]$PageFile.Put()
+	    }
+    }
+}
+
+Function FW-Pol
+{
+}
+
+Function Set-Service-Disable
+{
+	foreach ($p in $args)
+	{
+        Get-Service -name $p |Format-list Name,DisplayName,Status
+		Stop-Service -name $p -Force
+		Set-Service -name $p -StartupType "Disabled"
+        Get-Service -name $p |Format-list Name,DisplayName,Status
+	} 
+}
+
+Function Set-Reg
+{
+	Param(
+		[String]$RegPath,
+		[String]$RegKey,
+		[String]$RegKeyType,
+		[String]$RegKeyValue
+	)
+	Process
+	{
+		# レジストリそのものの有無確認
+		$Elements = $RegPath -split "\\"
+		$RegPath = ""
+		$FirstLoop = $True
+		foreach ($Element in $Elements )
+		{
+			if($FirstLoop)
+			{
+				$FirstLoop = $False
+			}
+			else
+			{
+				$RegPath += "\"
+			}
+			$RegPath += $Element
+			if( -not (test-path $RegPath) )
+			{
+				echo "Add Registry : $RegPath"
+				mkdir $RegPath
+			}
+		}
+		# Key有無確認
+		$Result = Get-ItemProperty $RegPath -name $RegKey -ErrorAction SilentlyContinue
+		# キーがあった時
+		if( $Result -ne $null ){
+			Set-ItemProperty $RegPath -name $RegKey -Value $RegKeyValue
+		}
+		else
+		{
+			# キーが無かった時 キーを追加する
+			New-ItemProperty $RegPath -name $RegKey -PropertyType $RegKeyType -Value $RegKeyValue
+		}
+		Get-ItemProperty $RegPath -name $RegKey
+	}
+}
+
+Function Remove-Explorer-History
+{
+	Remove-ItemProperty "HKCU:Software\Microsoft\Windows\CurrentVersion\Explorer\TypedPaths" url*	#エクスプローラのアドレスバーの履歴削除
+	Remove-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\WordWheelQuery"	#エクスプローラの検索バーの履歴削除
+	Remove-ItemProperty "HKCU:Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU" ?        	#ファイル名を指定して実行の履歴削除
+	Remove-ItemProperty "HKCU:Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU" url*       #ファイル名を指定して実行の履歴削除
+}
+
+Function Remove-RDP-History
+{
+	Remove-ItemProperty "HKCU:Software\Microsoft\Terminal Server Client\Default" MRU*             	#　リモートデスクトップ接続の履歴削除 
+}
+
+Function Remove-IE-History
+{
+	#　InternetExplorerの履歴削除
+	RunDll32.exe InetCpl.cpl,ClearMyTracksByProcess 255
+	RunDll32.exe InetCpl.cpl,ClearMyTracksByProcess 4351
+}
+
+Function Remove-EventLog
+{
+	#　イベントログの削除
+	[System.Diagnostics.Eventing.Reader.EventLogSession]::GlobalSession.ClearLog("setup")
+	[System.Diagnostics.Eventing.Reader.EventLogSession]::GlobalSession.ClearLog("Application")
+	[System.Diagnostics.Eventing.Reader.EventLogSession]::GlobalSession.ClearLog("Security")
+	[System.Diagnostics.Eventing.Reader.EventLogSession]::GlobalSession.ClearLog("system")
+	[System.Diagnostics.Eventing.Reader.EventLogSession]::GlobalSession.ClearLog("Windows PowerShell")
+}	
+Function Set-IIJ-Reg-Tuning 
+{
+    
+    Set-Reg "HKLM:SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" "dontdisplaylastusername""DWORD" "1" #対話型ログオン：最後のユーザー名を表示しない "有効:1"
+	Set-Reg "HKLM:SYSTEM\CurrentControlSet\Services\Lanmanserver\parameters" "Hidden" "DWORD" "1"             #ブラウジングリストに表示されないようにする 
+	Set-Reg "HKLM:SYSTEM\CurrentControlSet\Services\tcpip\parameters" "DisableIPSourceRouting" "DWORD" "2"    #ソースルーティングの無効化
+	Set-Reg "HKLM:SYSTEM\CurrentControlSet\Services\tcpip\parameters" "EnableDeadGWDetect" "DWORD" "0"        #反応しないゲートウェイの自動検出を無効にする 
+	Set-Reg "HKLM:SYSTEM\CurrentControlSet\Services\tcpip\parameters" "EnableICMPRedirect" "DWORD" "0"        #ICMPリダイレクトによるOSPF生成ルートの上書きを無効にする 
+	Set-Reg "HKLM:SYSTEM\CurrentControlSet\Services\tcpip\parameters" "KeepAliveTime" "DWORD" "300000"        #Keep-Aliveパケットの送信間隔を適切に設定する(既定：7200000 (2時間) ->300000 (5分))
+	Set-Reg "HKLM:SYSTEM\CurrentControlSet\Services\tcpip\parameters" "PerformRouterDiscovery" "DWORD" "0"    #IRDPを無効にする 
+	Set-Reg "HKLM:SYSTEM\CurrentControlSet\Services\tcpip\parameters" "TcpMaxDataRetransmissions" "DWORD" "3" #TCP が個々のデータ セグメントを再送信する回数を設定する
+}
+
+Function Set-RDP-Enable
+{
+    Set-Reg "HKLM:SYSTEM\CurrentControlSet\Control\Terminal Server" "fDenyTSConnections" "DWORD" "0"                          #リモートデスクトップを実行しているコンピュータからの接続を許可する'
+    Set-Reg "HKLM:SYSTEM\ControlSet001\Control\Terminal Server\WinStations\RDP-Tcp" "UserAuthentication" "DWORD" "0"          ## ネットワークレベル認証でリモートデスクトップを実行しているコンピューターからの接続を許可する Disable
+    Set-Reg "HKLM:SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" "PortNumber" "DWORD" $RDP_PortNumber  #RDP接続ポート変更(tcp/3389)'"      
+}
+Function Set-NetFirewall-Rule-IIJ
+{
+    Set-NetFirewallRule -Name FPS-ICMP4-ERQ-In -Enabled True                                                    #ファイルとプリンターの共有 (エコー要求 - ICMPv4 受信) （有効）             
+    Get-NetFirewallRule -Name "FPS-ICMP4-ERQ-In" |Format-List DisplayName,Profile,Enabled,Action
+    Get-NetFirewallRule -DisplayGroup "リモート デスクトップ" |Set-NetFirewallRule -Enabled True
+    Get-NetFirewallRule -DisplayGroup "リモート デスクトップ" |Format-List DisplayName,Profile,Enabled,Action
+}
+
+function Firewall_rule
+{
+
+if (-not(Get-NetFirewallRule | where Name -eq PowerShellRemoting-In))
+{
+	New-NetFirewallRule `
+		-Name PowerShellRemoting-In `
+		-DisplayName PowerShellRemoting-In `
+		-Description "Windows PowerShell Remoting required to open for public connection. not for private network." `
+		-Group "Windows Remote Management" `
+		-Enabled True `
+		-Profile Any `
+		-Direction Inbound `
+		-Action Allow `
+		-EdgeTraversalPolicy Block `
+		-LooseSourceMapping $False `
+		-LocalOnlyMapping $False `
+		-OverrideBlockRules $False `
+		-Program Any `
+		-LocalAddress Any `
+		-RemoteAddress Any `
+		-Protocol TCP `
+		-LocalPort 5985 `
+		-RemotePort Any `
+		-LocalUser Any `
+		-RemoteUser Any 
+}
+else
+{
+		Write-Verbose "Windows PowerShell Remoting port TCP 5985 was alredy opend. Show Rule"
+		Get-NetFirewallPortFilter -Protocol TCP | where Localport -eq 5985
+}
+
+}
+Function Get-Download-File 
+{
+    Param(
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$Target,
+        [Parameter(Mandatory=$True,Position = 1)]
+        [String]$DestPath,
+        [Parameter(Mandatory=$False,Position = 2)]
+        [String]$pURL,
+        [Parameter(Mandatory=$False,Position = 3)]
+        [String]$pUser,
+        [Parameter(Mandatory=$False,Position = 4)]
+        [String]$pPass
+    )
+    # DL対象ファイルのURL
+    Process
+    {
+        # WebClient設定
+        $web_client = New-Object System.Net.WebClient
+        if ($pURL.length -gt 0)
+        {
+            $pserver = New-Object System.Net.WebProxy($pURL, $true)
+            if ($pUser.length -gt 0)
+            {
+                $credential = New-Object System.Net.NetworkCredential($pUser, $pPass)
+                $pserver.Credentials = $credential
+            }
+            $web_client.Proxy = $pserver
+        }
+        # ファイルダウンロード
+        $DL_Path = Join-Path $DestPath $(Split-Path $BGInfoURL -Leaf)
+        $web_client.DownloadFile($target, $DL_Path)
+    }
+
+
+}
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+function Unzip{ 
+     param(
+        [string]$zipfile, 
+        [string]$outpath
+    ) 
+    Process
+    {
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($zipfile, $outpath)
+    }
+} 
+
+#Get-Download-File $BGInfoURL $env:TMP $Proxy_URL $Proxy_user $Proxy_pass
+#Set-BGinfo
+#Set-VolumeLabel "C" "System"
+#Set-DVD_DriveLetter $DVD_Drive_Letter
+#Set-startup-delay-time $StartupDelayTimeOut
+#Set-Service-Disable $Disable_Services
+#Set-EventLog-Size $Logs
+#Set-Windows-Error-Report-Option 
+#Set-ceip-Option 
+#Set-IIJ-Reg-Tuning
+#Set-IPv6-PrefixPolicy
+#Set-AutoSize-Pagefile $false
+#Set-Powercfg-High
+#Set-RDP-Enable
+#Set-NetFirewall-Rule-IIJ
+#Set-Windowsupdate-Disable
+#Set-AdminPass-Expires
