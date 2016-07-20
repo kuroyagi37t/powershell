@@ -11,10 +11,12 @@ $DebugPreference = "Continue"
 [String]$Script:psName = Split-Path $MyInvocation.InvocationName -Leaf
 [String]$Script:psBaseName = $psName -replace "\.ps1$", ""
 [String]$Script:timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+[int]$SKIPCNT=0
 
 ## 環境設定用変数
 [String]$csv_encode = "UTF8"          #入力用CSVファイルの文字コード　UTF8 or sjis  
-[String]$CSV_HeadStr="OU,ログイン名,パスワード,電子メールアドレス,姓,名,表示名"            ## CSV用ヘッダー
+#[String]$CSV_HeadStr="OU,ログイン名,パスワード,電子メールアドレス,姓,名,表示名"            ## CSV用ヘッダー
+[String]$CSV_HeadStr="OU,表示名,姓,名,ログイン名,パスワード,電子メールアドレス"            ## CSV用ヘッダー
 [String]$CSVfile="c:\scripts\useradd\data\input.csv"                                ##　入力用CSVファイル       
                 
 [String]$global:sLogPath=$basedir+"\logs\"                ## Log出力用
@@ -31,6 +33,7 @@ $DebugPreference = "Continue"
 [String]$Script:ERRMSG_AccDupChk_Email_EXIST=$timestamp+':eMailアドレスが重複しています。->'
 [String]$Script:ERRMSG_PwdChk_PwdLen_o365_Err=$timestamp+': パスワードの長さがOffice365の制限より不足しています。->'
 [String]$Script:ERRMSG_PwdChk_PwdLen_Short=$timestamp+': パスワードの長さが不足しています。->'
+[String]$Script:ERRMSG_PwdChk_PwdStr_unmatch=$timestamp+': パスワード使用不可文字のチェック o365制限に抵触しています。->'
 [String]$Script:ERRMSG_PwdChk_PwdPol_unmatch=$timestamp+':パスワードが複雑性(文字種が英小、英大、数字、記号のうち3つ)の要求を満たしていません。->'
 [String]$Script:ERRMSG_CreateUser_Err=$timestamp+':アカウントの登録に失敗しました。->'
 [String]$Script:ERRMSG_CSV_Chk_Err=$timestamp+':CSVの内容でエラーがあったため処理を中止します。'
@@ -64,7 +67,7 @@ Function Check-Account
     {
 		#Check to see if the user already exists
 		$userFilterString = "samAccountName -eq `"" + $Account + "`""
-        echo $userFilterString
+        #echo $userFilterString
 		$rt = Get-ADUser -Filter $userFilterString
 		#If user not already created, create them
 		if ($rt -ne $null) 
@@ -86,7 +89,8 @@ Function Check-Account
 }
 ##
 ## パスワードポリシーチェック処理 
-##　 英小文字、英大文字、数字、記号 @ # $ % ^ & * ? _ + = [ ] { } | \ : ‘' , . ? / ` ~ “ < > ( ) ;
+##　 英小文字、英大文字、数字、記号 @ # $ % ^ & * ? _ + = [ ] { } | \ : ‘' , . ? / ` ~ “ < > ( ) ! ; 
+##   記号追加　"!"
 Function Check-PasswordPolicy
 {
 	[OutputType([String])]
@@ -117,19 +121,19 @@ Function Check-PasswordPolicy
             ++$SkipCnt
 		}
         #パスワード使用不可文字のチェック o365制限 ※空白とかはNG
-        if (-not($Password -cmatch "^[a-zA-Z0-9@#$%^&*-_+=\[\]{}|\\:',.?/`~<>()]*$"))
-        {
-            Write-SkipLog $ERRMSG_PwdChk_PwdLen_Short$account"文字数："$Password.length
-            ++$SKipCnt
-        }
+        #if (-not($Password -cmatch "^[a-zA-Z0-9@#$%^&*-_+=\[\]{}|\\:',.?/`~<>()!]*$"))
+        #{
+        #    Write-SkipLog $ERRMSG_PwdChk_PwdStr_unmatch$account"文字："$Password
+        #    ++$SKipCnt
+        #}
 		#複雑性のチェック 2種類以下の場合はNG
 		if($passpolicy.ComplexityEnabled -eq "True") 
         {
-			if(($Password -cmatch "[a-z]")+($Password -cmatch "[A-Z]")+($Password -cmatch "[0-9]")+($Password -cmatch "[@#$%^&*-_+=\[\]{}|\\:',.?/`~<>()]") -le 2) 
-            {
-                Write-SkipLog $ERRMSG_PwdChk_PwdPol_unmatch$account
-                ++$SkipCnt
-			}
+			#if(($Password -cmatch "[a-z]")+($Password -cmatch "[A-Z]")+($Password -cmatch "[0-9]")+($Password -cmatch "[@#$%^&*-_+=\[\]{}|\\:',.?/`~<>()!]") -le 2) 
+            #{
+            #    Write-SkipLog $ERRMSG_PwdChk_PwdPol_unmatch$account
+            #    ++$SkipCnt
+			#}
 		}
         return $SkipCnt
 	} 
@@ -262,15 +266,14 @@ Check-Exist-Path $csvfile_Bkup
 $CSV_Header = $CSV_HeadStr -split ","
 $csvdata = Get-Content $csvfile |Select-Object -Skip 1 | ? {$_.trim() -ne "" } |ConvertFrom-Csv -Header $CSV_Header
 ##CSVの内容チェック
-$csvdata |ForEach-Object  
-{
+$csvdata |ForEach-Object{
 	Check-Account $_.ログイン名 $_.電子メールアドレス
     Check-PasswordPolicy $_.ログイン名 $_.パスワード
 }
+
 if ($SKIPCNT -eq 0) 
 {
-    $csvdata | foreach 
-    {
+    $csvdata | foreach {
     	$AccountList = @{
     		Path="OU="+$_.OU+",OU=user,"+$MyDomain.distinguishedname
 	    	sAMAccountName=$_.ログイン名
@@ -291,18 +294,3 @@ else
     Write-SkipLog ERRMSG_CSV_Chk_Err
 }
 
-
-Function Set_ADPasswordSync 
-{
-    $adConnector = "<CASE SENSITIVE AD CONNECTOR NAME>"
-    $aadConnector = "<CASE SENSITIVE AAD CONNECTOR NAME>"
-    Import-Module adsync
-    $c = Get-ADSyncConnector -Name $adConnector
-    $p = New-Object Microsoft.IdentityManagement.PowerShell.ObjectModel.ConfigurationParameter “Microsoft.Synchronize.ForceFullPasswordSync”, String, ConnectorGlobal, $null, $null, $null
-    $p.Value = 1
-    $c.GlobalParameters.Remove($p.Name)
-    $c.GlobalParameters.Add($p)
-    $c = Add-ADSyncConnector -Connector $c
-    Set-ADSyncAADPasswordSyncConfiguration -SourceConnector $adConnector -TargetConnector $aadConnector -Enable $false
-    Set-ADSyncAADPasswordSyncConfiguration -SourceConnector $adConnector -TargetConnector $aadConnector -Enable $true
-}
