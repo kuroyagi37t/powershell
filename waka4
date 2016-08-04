@@ -1,0 +1,627 @@
+<#
+ Import ActiveDirectory Module
+PS C:\> import-module servermanager 
+PS C:\> Add-WindowsFeature -Name “RSAT-AD-PowerShell” -IncludeAllSubFeature
+#>
+
+
+Import-Module C:\Scripts\PSFTP\PSFTP
+Import-Module C:\scripts\SSH-Sessions\SSH-Sessions
+
+## FTP  環境変数
+$FTP_Server="ftp://172.16.19.225"
+$FTP_User="Administrator"
+$FTP_Pass=ConvertTo-SecureString –String "P@ssw0rd" –AsPlainText -Force
+$FTP_Session = "FromAWS"
+$NEW_CSV_PATH="/"
+$DEL_CSV_PATH="/Delete"
+$Local_DownLoad_Path="work"
+$Local_DownLoad_Drive="C:"
+$FTP_NEW_CSV_PATH = Join-Parts -Separator "/" -Parts $FTP_Server,$NEW_CSV_PATH
+$cred = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $FTP_User,$FTP_Pass
+
+## SSH 環境変数
+$SSH_Server="172"
+$SSH_User="root"
+$SSH_Pass="Usk6v9EE"
+$SSH_Port="22"
+
+## CSV 環境変数
+$CSV_HeaderSTR="adhomedirectory,uid,group,option04,option03"
+## CSV読み込み
+$CSV_Header = $CSV_HeadStr -split ","
+
+
+Function GET_NewUserCSV{
+    GET_CSV $NEW_CSV_PATH
+    Create_HomeDir
+    DEL_CSV $NEW_CSV_PATH
+}
+
+Function GET_DelUserCSV
+{
+    GET_CSV $DEL_CSV_PATH
+    Move_Home
+    DEL_CSV $DEL_CSV_PATH
+
+}
+
+Function Create_HomeDir
+{
+    ## CSV  一覧取得
+    $csv_list = Get-ChildItem -Path  (Join-Path $Local_Download_Drive $Local_Download_Path)
+    foreach ($csvfile in $csv_list)
+    {
+    ## レコード  内容取得 (1行目 SKIP)
+        $csvdata = Get-Content $csvfile |Select-Object -Skip 1 | ? {$_.trim() -ne "" } |ConvertFrom-Csv -Header $CSV_Header
+        $csvdata | ForEach-Object {
+    ## グループ取得
+            Check-Account $_.uid
+            if ($_.group = "tea")
+            {
+                Add-TeachersADGroup
+            }
+            else
+            {
+                Add-StudentsADGroup
+            }
+            Set-PrimaryGroup $_.uid $_.group         
+    ## Windows Home (waka-nas01)作成
+            Create_WindowsHomeDir
+    ## Linux Home (waka-nfs01)作成
+            Create_LinuxHomeDire
+    ## CSV 処理済みファイル名変更
+        }
+    }
+}
+
+
+Function GET_CSV
+{
+	[OutputType([String])]
+	[CmdletBinding()]
+    Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$FTP_Path
+    )
+    Process 
+    {
+        Set-FTPConnection -Server $FTP_Server -Credential $cred -Session $FTP_Session -KeepAlive  -UsePassive
+        $FTP_LIST=Get-FTPChildItem -Session $FTP_Session -Path $FTP_PATH
+        $FTP_LIST |ForEach-Object {
+            $Local_File = Join-Path $Local_Download_Drive $Local_Download_Path |Join-Path -ChildPath $_.Name
+            if (-not (Test-path -Path $Local_File))
+            {
+                $LOCAL_OLD_FILE = $LOCAL_FILE.Replace(".txt","_old.txt")
+                if (-not (Test-path -Path $LOCAL_OLD_FILE))
+                {
+                    Get-FTPItem -Session $FTP_Session -Path $FTP_List.FullName -LocalPath $Local_File
+                }
+                else
+                {
+                    echo $LOCAL_OLD_FILE" Exist"
+                }    
+            }
+            else
+            {
+                echo $LOCAL_FILE" sExist" 
+            } 
+        }
+    }
+}
+
+Function DEL_CSV
+{
+	[OutputType([String])]
+	[CmdletBinding()]
+    Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$FTP_Path
+    )
+    Process 
+    {
+        Set-FTPConnection -Server $FTP_Server -Credential $cred -Session $FTP_Session -KeepAlive  -UsePassive
+        $FTP_LIST=Get-FTPChildItem -Session $FTP_Session -Path $FTP_PATH
+        $FTP_LIST |ForEach-Object {
+            $Local_File = Join-Path $Local_Download_Drive $Local_Download_Path |Join-Path -ChildPath $_.Name
+            if (-not (Test-path -Path $Local_File))
+            {
+                $LOCAL_OLD_FILE = $LOCAL_FILE.Replace(".txt","_old.txt")
+                if (-not (Test-path -Path $LOCAL_OLD_FILE))
+                {
+                    Get-FTPItem -Session $FTP_Session -Path $FTP_List.FullName -LocalPath $Local_File
+                }
+                else
+                {
+                    echo $LOCAL_OLD_FILE" Exist"
+                }    
+            }
+            else
+            {
+                echo $LOCAL_FILE" sExist" 
+            } 
+        }
+    }
+}
+
+
+##
+## ADアカウント重複チェック処理 
+##
+Function Check-Account 
+{
+	[OutputType([String])]
+	[CmdletBinding()]
+	Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$Account
+    )
+
+    Begin 
+    {
+        [int]$Private:SkipCnt=0
+    }
+	Process 
+    {
+		#Check to see if the user already exists
+		$userFilterString = "samAccountName -eq `"" + $Account + "`""
+        #echo $userFilterString
+		$rt = Get-ADUser -Filter $userFilterString
+		#If user not already created, create them
+		if ($rt -ne $null) 
+        {
+            Write-SkipLog $ERRMSG_AccDupChk_ACC_EXIST$account
+            ++$SkipCnt
+        }
+        return $SkipCnt
+	}
+}
+#========================================================
+# ActiveDIrectory Function 
+#========================================================
+Function Set-PrimaryGroup 
+{
+	Param (
+			[string]$username=$(Throw "Error: Please enter a username!"),
+			[string]$groupname="Domain Users"
+		)
+	Process	{
+    	Try	{
+	        #Get the DistinguishedName of the user for you want to change the primary group
+			$UserDistinguishedName = (Get-ADUser -Identity $username -ErrorAction Stop).DistinguishedName
+			Try {
+				#Get SID of the Group that will become the primary group
+				$PrimaryGroupID = (Get-ADGroup -Identity $groupname -Properties PrimaryGroupToken -ErrorAction Stop)
+
+				#Get the last 4 digits of the SID to become te PrimaryGroupID
+###				$PrimaryGroupID = $GroupSid.Value.Substring($groupsid.Value.LastIndexOf('-')+1)
+
+				#Replace the PrimaryGroupID of the user with its new value. The user has to be already a member of this group.
+				Set-ADObject -Identity "$UserDistinguishedName" -replace @{PrimaryGroupID=$PrimaryGroupID}
+				Write-Host "$groupname set as primary group for user $username"
+			}
+			Catch {
+				Write-Host "Error: Unable to find the PrimaryGroupID for group $GroupName! Maybe the group does not exist." -ForegroundColor red
+			}
+		}
+		Catch {
+			Write-Host "Error: Unable to find user $username!" -ForegroundColor red
+		}
+	}
+}
+
+Function Add-TeachersADGroup 
+{
+    [CmdletBinding()]
+	Param (
+			[string]$username=$(Throw "Error: Please enter a username!")
+		)
+	Process
+	{
+	    #Get the DistinguishedName of the user for you want to change the primary group
+		if ((Check-Account $username) -eq 1) 
+        {
+			#Get SID of the Group that will become the primary group
+            $grpTBL = @("TeachersUsers","PrintAdmins","linux_Teachers")
+            foreach ($ggg in $grpTBL) {
+                $rt = Get-ADGroupMember -Identity $ggg |Where { $_.SamAccountName -eq $username }
+                if ($rt -eq $null)
+                {
+                    Add-ADGroupMember -Identity $ggg  -Member $username
+                }
+                else
+                {
+        			Write-Host "Skip: 既にグループに登録されています。->username:"$username" group:"$ggg
+                }
+            }
+			Write-Host "$groupname set as primary group for user $username"
+		}
+	}
+}
+
+Function Add-StudentsADGroup 
+{
+    [CmdletBinding()]
+	Param (
+			[string]$username=$(Throw "Error: Please enter a username!"),
+			[string]$groupname="Domain Users"
+		)
+	Process	{
+    	Try	{
+	        #Get the DistinguishedName of the user for you want to change the primary group
+			Get-ADUser -Identity $username -ErrorAction Stop
+			Try {
+				#Get SID of the Group that will become the primary group
+				Add-ADGroupMembers -Identity "StudentsUsers"  -Member $username
+				Add-ADGroupMembers -Identity "linux_"$groupname -Member $username
+				Add-ADGroupMembers -Identity $groupname       -Member $username
+				Write-Host "$groupname set as primary group for user $username"
+			}
+			Catch {
+				Write-Host "Error: Unable to find the PrimaryGroupID for group $GroupName! Maybe the group does not exist." -ForegroundColor red
+			}
+		}
+		Catch {
+			Write-Host "Error: Unable to find user $username!" -ForegroundColor red
+		}
+	}
+}
+
+#========================================================
+# File Server Function 
+#========================================================
+Function Create_WindowsHomeDir 
+{
+<#
+    winrm 初期設定　
+    　　winrm qc
+#>
+    [CmdletBinding()]
+	Param (
+			[string]$username=$(Throw "Error: Please enter a username!"),
+			[string]$groupname="Domain Users",
+			[string]$HomeDirPath="Domain Users"
+		)
+	Process
+	{
+        try
+        {
+<#
+$ipAddress = "192.168.1.1"
+$user = "test01"
+$pass = "passw0rd"
+$secPassword = ConvertTo-SecureString $pass -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential($user,$secPassword)
+            $psSessionOption = New-PSSessionOption -NoMachineProfile -SkipCACheck -SkipCNCheck -SkipRevocationCheck
+#>
+            $PSSession = New-PSSession $WINFS -Credential $WinCredential
+            if ($group="tea")
+            {
+                Invoke-Command -Session $PSSession -ScriptBlock {mkdir $args[0]} -ArgumentList $HomeDirPath
+                Invoke-Command -Session $PSSession -ScriptBlock {mkdir $args[0]} -ArgumentList $HomeDirPath"¥public_html"
+                Invoke-Command -Session $PSSession -ScriptBlock {mkdir $args[0]} -ArgumentList $HomeDirPath"¥private_html"
+                Invoke-Command -Session $PSSession -ScriptBlock {icalcs $args[0] /grant:r $args[1] :(CI)(OI)F /T /C /inheritance:e} -ArgumentList $HomeDirPath,$username
+                Invoke-Command -Session $PSSession -ScriptBlock {icalcs $args[0] /setown:r $args[1] /T /C} -ArgumentList $HomeDirPath,$username
+            }
+            else
+            {
+                $HomeDefaultPath = Join-Path (Split-Path $HomeDirPath -Parent) "¥home_default¥"
+                Invoke-Command -Session $PSSession -ScriptBlock {mkdir $args[0]} -ArgumentList $HomeDirPath
+                Invoke-Command -Session $PSSession -ScriptBlock {robocopy.exe /S /E /W:1 /R:1  $args[0]  $args[1]} -ArgumentList $HomeDefaultPath,$HomeDirPath
+                Invoke-Command -Session $PSSession -ScriptBlock {mkdir $args[0]} -ArgumentList $HomeDurPath"¥private_html"
+                Invoke-Command -Session $PSSession -ScriptBlock {icalcs $args[0] /grant:r $args[1] :(CI)(OI)F /T /C /inheritance:e} -ArgumentList $HomePath,$username
+                Invoke-Command -Session $PSSession -ScriptBlock {icalcs $args[0] /grant:r $args[1] :(CI)(OI)RX /T /C /inheritance:e} -ArgumentList $HomePath,"stu¥linux_"$group
+                Invoke-Command -Session $PSSession -ScriptBlock {icalcs $args[0] /setown:r $args[1] /T /C} -ArgumentList $HomePath,$username
+            }
+            Remove-PSSession $PSSession
+        }
+        catch
+        {
+            echo "filserever not connect"
+        }
+    } 
+<#
+
+
+sub sub_fs_tea ()
+	command = psexec_fs & "cmd /c mkdir "& fs_dir & "¥" & "tea" & "¥" & uid
+	sub_run command , "(nas) ユーザーディレクトリの作成" , 0
+	command = psexec_fs & "cmd /c mkdir " & fs_dir & "¥" & "tea" & "¥" & uid & "¥public_html"
+	sub_run command , "(nas) public_htmlディレクトリの作成" , 0
+	command = psexec_fs & "cmd /c mkdir " & fs_dir & "¥" & "tea" & "¥" & uid & "¥private_html"
+	sub_run command , "(nas) private_htmlディレクトリの作成" , 0
+	command = psexec_fs & "icacls " &fs_dir & "¥" & "tea" & "¥" & uid & " /grant:r " & domain & "¥" & uid & ":(CI)(OI)F /T /C /inheritance:e"
+	sub_run command , "(nas) ユーザーディレクトリNTFS権限変更" , 0
+	command = psexec_fs & "icacls " &fs_dir & "¥" & "tea" & "¥" & uid & " /setowner " & domain & "¥" & uid & " /T /C"
+	sub_run command , "(nas) ユーザーディレクトリ所有者変更" , 0
+end sub
+
+sub sub_fs_stu ()
+
+	command = psexec_fs & "cmd /c mkdir "& fs_dir & "¥stu¥" & fsstu_group & "¥" & uid
+	sub_run command , "(nas) ユーザーディレクトリの作成" , 0
+
+	command = psexec_fs & "robocopy.exe /S /E /W:1 /R:1 " & fs_dir & "¥stu¥" & fsstu_group & "¥home_default¥ " & fs_dir & "¥stu¥" & fsstu_group & "¥" & uid & "¥"
+	sub_run command , "(nas) デフォルトディレクトリのrobocopy" , 1
+
+	command = psexec_fs & "cmd /c mkdir " & fs_dir & "¥stu¥" & fsstu_group & "¥" & uid & "¥private_html"
+	sub_run command , "(nas) private_htmlディレクトリの作成" , 0
+
+	command = psexec_fs & "icacls " &fs_dir & "¥stu¥" & fsstu_group & "¥" & uid & " /grant:r " & domain & "¥" & uid & ":(CI)(OI)F /T /C /inheritance:e"
+	sub_run command , "(nas) ユーザーディレクトリNTFS権限変更" , 0
+
+end sub
+
+sub sub_fs_stu2 ()
+
+	command = psexec_fs & "icacls " & fs_dir & "¥stu¥" & fsstu_group & "¥" & uid & " /grant:r " & domain & "¥linux_" & group & ":(CI)(OI)RX /T /C /inheritance:e"
+	sub_run command , "(nas) ユーザーディレクトリNTFS権限変更" , 0
+
+	command = psexec_fs & "icacls " & fs_dir & "¥stu¥" & fsstu_group & "¥" & uid & " /setowner " & domain & "¥" & uid & " /T /C"
+	sub_run command , "(nas) ユーザーディレクトリ所有者変更" , 0
+
+end sub
+
+sub sub_nfs01 ()
+
+	nfs_home = ""
+    If group = "teachars" Then
+		nfs_home = "tea"
+	else
+		nfs_home = "stu/" & mail_group
+	End If
+	
+	command = ssl_command & ssl_wakanfs01 & "mkdir /home/" & nfs_home & "/" & uid
+	sub_run command , "(waka-nfs01) ホームディレクトリ作成" , 0
+'	command = ssl_command & ssl_wakanfs01 & "chown -R " & uid & ":" & "linux_" & group & " /home/" & nfs_home & "/" & uid
+	command = ssl_command & ssl_wakanfs01 & "chown -R " & uid & ":" & "linux_" & unixgroup & " /home/" & nfs_home & "/" & uid
+	sub_run command , "(waka-nfs01) ホームディレクトリ所有者変更" , 0
+	command = ssl_command & ssl_wakanfs01 & "chmod 700 /home/" & nfs_home & "/" & uid
+	sub_run command , "(waka-nfs01) ホームディレクトリパーミッション変更" , 0
+
+end sub
+#>
+}
+
+Function Creat_LinuxHomeDir 
+{
+	Param (
+			[string]$username=$(Throw "Error: Please enter a username!"),
+			[string]$groupname="Domain Users",
+			[string]$HomeDirPath="Domain Users"
+		)
+    Begin {
+        New-SshSession -ComputerName $SSH_Server -Username $SSH_User -Password $SSH_Pass -Port $SSH_Port
+    }
+	Process
+	{
+        $GrpPath = Split-Path (Split-Path $HomeDirPath -Parent) -Leaf
+        Invoke-SSHCommand -Connection $SSHSession -ScriptBlock {mkdir /home/$args[0]} -ArgumentList $GrpPath"/"$UserName
+        Invoke-SSHCommand -Connection $SSHSession -ScriptBlock {chown -R $args[0] /home/$args[1]} -ArgumentList $group,$GrpPath"/"$UserName
+        Invoke-SSHCommand -Connection $SSHSession -ScriptBlock {chmod 700 /home/$args[0]} -ArgumentList $GrpPath"/"$UserName
+    }
+    End {
+        Remove-SshSession -ComputerName $SSH_Server
+    }
+}
+
+
+
+Function Move_Home
+{
+##MAIN
+    $SUCMSG_START | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+    #バックアップ対象のフォルダがない場合は処理を停止
+    if((Test-Path $target_dir) -eq $false)
+    {
+        $ERRMSG_FOLDER_EXIST | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+        exit 1
+    }
+
+    #退避先のユーザ種別フォルダがない場合は処理を停止
+    if((Test-Path $bkup_user_type_dir) -eq $false)
+    {
+        $ERRMSG_BKUP_USER_FOLDER_EXIST | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+        exit 1
+    }
+
+    #退避先に同名のユーザフォルダが存在する場合は処理を停止
+    if((Test-Path $bkup_target_dir) -eq $true)
+    {
+        $ERRMSG_BKUP_FOLDER_EXIST | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+        exit 1
+}
+
+#フォルダ退避処理
+try{
+  Move-Item $target_dir -destination $bkup_target_dir
+}
+catch{
+  $ERRMSG_FOLDER_MOVE | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+  $error | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+  exit 1
+}
+$SUCMSG_FOLDER_MOVE | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+
+#タイムスタンプを現在の時刻にする (Linux の touch 相当)
+try{
+  $(Get-Item $bkup_target_dir).LastWriteTime = Get-Date
+}
+catch{
+  $ERRMSG_TIMESTAMP | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+  $error | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+  exit 1
+}
+$SUCMSG_TIMESTAMP | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+$SUCMSG_ALL | Out-File -Append -Encoding 'utf8' -FilePath $LOG_FILE
+exit 0
+}
+
+Function Check-Path
+{
+    ForEach ($cpath in $args)
+    {
+        if (-not (Test-Path -Path $cpath))
+        {
+            Write-ErrorLog $ERRMSG_File_Not_EXIST$cpath
+        }
+    }    
+}
+
+Function Check-Exist-Path
+{
+    ForEach ($cpath in $args)
+    {
+        if (Test-Path -Path $cpath)
+        {
+            Write-ErrorLog $ERRMSG_File_Already_EXIST$cpath
+        }
+    }
+}
+
+Function Rename-File
+{
+	[OutputType([String])]
+	[CmdletBinding()]
+    Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$FilePath,
+        [Parameter(Mandatory=$True,Position = 1)]
+        [String]$NewFileName
+    )
+    Process 
+    {
+        if(Test-Path -LiteralPath $FilePath -PathType Leaf)
+        {
+            $newFilePath = Join-Path -Path (Split-Path $FilePath -Parent) -ChildPath $NewFileName
+            Move-Item -LiteralPath $FilePath -Destination $newFilePath
+        }
+        else 
+        {
+            Write-SkipLog $ERRMSG_RenFile_File_NOT_EXIST+$FilePath
+        }
+    }
+}
+filter Skip-Null { $_|?{ $_ } }
+Function Join-Parts
+{
+ 	[OutputType([String])]
+	[CmdletBinding()]
+    Param
+    (
+        $Parts = $null,
+        $Separator = ''
+    )
+    Process 
+    {
+        [String]$s = ''
+        $Parts | Skip-Null | ForEach-Object {
+            $v = $_.ToString()
+            if ($s -ne '')
+           {
+                if (-not ($s.EndsWith($Separator)))
+                {
+                    if (-not ($v.StartsWith($Separator)))
+                    {
+                        $s += $Separator
+                    }
+                    $s += $v
+                }
+                elseif ($v.StartsWith($Separator))
+                {
+                    $s += $v.SubString($Separator.Length)
+                }
+            }
+            else
+            {
+                $s = $v
+            }
+        }
+        $s
+    }
+}
+
+
+
+###Main
+Add-TeachersADGroup tea002
+Set-PrimaryGroup tea002 linux_teachers
+
+
+
+<# Linux MakeHomeDi
+#!/bin/bash
+
+USERNAME=$1
+GRP=$2
+
+if [ $# -ne 2 ]; then
+   echo "引数の個数が不正です:$#"
+fi
+
+HHH=$(hostname -s)
+BaseDir="/home"
+BaseDirG=${BaseDir}/${GRP}
+HomeDir=${BaseDirG}/${USERNAME}
+id ${USERNAME} > /dev/null 2>&1
+RET=$?
+if [ $RET -ne 0 ];then
+   echo "(${HHH})ユーザが登録されていません->"${USERNAME}
+   exit 1
+fi
+
+UIDNUM=$(id ${USERNAME} |awk -F'[=()]' '{print $2}')
+GIDNUM=$(id ${USERNAME} |awk -F'[=()]' '{print $5}')
+
+expr ${UIDNUM} / 1 >/dev/null 2>&1
+RET=$?
+if [ $RET -gt 1 ];then
+   echo "(${HHH})UID Numberが不正です->${UIDNUM}"
+   exit 1
+fi
+
+expr ${GIDNUM} / 1 >/dev/null 2>&1
+RET=$?
+if [ $RET -gt 1 ];then
+   echo "(${HHH})GID Numberが不正です->${GIDNUM}:${RET}"
+   exit 1
+fi
+
+if [ ! -d ${BaseDirG} ]; then
+   echo "(${HHH})ベースのディレクトリが存在しません。->${BaseDirG}"
+   exit 1
+fi 
+
+if [ -d ${HomeDir} ]; then
+   echo "(${HHH})ホームディレクトリが存在します。->${HomeDir}"
+   exit 1
+fi 
+
+mkdir ${HomeDir}
+RET=$?
+if [ $RET -ne 0 ];then
+   echo "(${HHH})ディレクトリが作成できませんでした->${HomeDir}"
+   exit 1
+fi
+echo "(${HHH})ホームディレクトリ作成->${HomeDir}"
+
+chown -R ${UIDNUM}:${GIDNUM} ${HomeDir}
+RET=$?
+if [ $RET -ne 0 ];then
+   echo "(${HHH})オーナが変更できませんでした-> chown -R ${UIDNUM}:${GIDNUM} ${HomeDir}"
+   exit 1
+fi
+echo "(${HHH}) ホームディレクトリ所有者変更-> chown -R ${UIDNUM}:${GIDNUM} ${HomeDir}"
+
+chmod 700 ${HomeDir}
+RET=$?
+if [ $RET -ne 0 ];then
+   echo "(${HHH})パーミッションが変更できませんでした-> chmod 700 ${HomeDir}"
+   exit 1
+fi
+echo "(${HHH})ホームディレクトリパーミッション変更->  ${HomeDir}"
+#>
