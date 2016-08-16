@@ -1,0 +1,10 @@
+$OUServer=$(get-addomain).ridmaster
+$DSSPath=$(get-adgroup -identity bio).DistinguishedName
+$connection = "LDAP://$OUServer/$DSSPath"
+$UserDN=$(get-aduser -identity tea001).DistinguishedName
+$Group = [adsi]"$connection"
+$User = "LDAP://$OUServer/$UserDN"
+$Group.Add($User) 
+$UserDN2=$(get-aduser -identity tea002).DistinguishedName
+$User2 = "LDAP://$OUServer/$UserDN2"
+$Group.Add($User2) 
