@@ -8,3 +8,14 @@ $Group.Add($User)
 $UserDN2=$(get-aduser -identity tea002).DistinguishedName
 $User2 = "LDAP://$OUServer/$UserDN2"
 $Group.Add($User2) 
+
+$DSSPath=$(get-adgroup -identity bio).DistinguishedName
+$RT=([ADSIsearcher]"(&(objectclass=user)(sAMAccountName=tea002)(memberof=$DSSPath))").findall() |select Path
+if ($RT.length -eq 0) 
+{
+	$connection = "LDAP://$DSSPath"
+	$UserDN=$(get-aduser -identity tea001).DistinguishedName
+	$Group = [adsi]"$connection"
+	$User = "LDAP://$OUServer/$UserDN"
+	$Group.Add($User) 
+}
