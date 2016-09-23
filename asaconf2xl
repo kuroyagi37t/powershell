@@ -1,0 +1,194 @@
+[string]$Data_Path = "c:\users\pcadmin\desktop\"
+[string]$Excel_File = "book1.xlsx"
+[string]$global:CenterFooter = "Copyright (C) 2016 Internet Initiative Japan Inc.,  All rights reserved."
+[string]$global:RightFooter = ""
+[string]$global:LeftFooter = ""
+[string]$global:CenterHeader = ""
+[string]$global:RightHeader = ""
+[string]$global:LeftHeader = ""
+
+
+Function Open-Excel
+{
+
+    # Microsoft.Office.Interop.Excel.XlBorderWeight
+    $xlHairline = 1
+    $xlThin = 2
+    $xlThick = 4
+    $xlMedium = -4138
+
+    # Microsoft.Office.Interop.Excel.XlBordersIndex
+    $xlDiagonalDown = 5
+    $xlDiagonalUp = 6
+    $xlEdgeLeft = 7
+    $xlEdgeTop = 8
+    $xlEdgeBottom = 9
+    $xlEdgeRight = 10
+    $xlInsideVertical = 11
+    $xlInsideHorizontal = 12
+
+    # Microsoft.Office.Interop.Excel.XlLineStyle
+    $xlContinuous = 1
+    $xlDashDot = 4
+    $xlDashDotDot = 5
+    $xlSlantDashDot = 13
+    $xlLineStyleNone = -4142
+    $xlDouble = -4119
+    $xlDot = -4118
+    $xlDash = -4115
+
+    $global:xl = New-Object -ComObject Excel.Application
+    $xl.Visible = $true
+    $global:bk = $xl.Workbooks.Open($Data_Path+$Excel_File)
+    $global:sh = $bk.Worksheets.Item("Sheet1")
+    echo $sh.Cells.Item(4,11).Text
+    echo $("Footer"+$CenterFooter)
+    # ヘッダーの設定
+    $sh.pageSetup.CenterHeader = $CenterHeader
+    $sh.pageSetup.RightHeader  = $RightHeader
+    $sh.pageSetup.LeftHeader   = $LeftHeader
+
+    # フッターの設定
+    $sh.pageSetup.CenterFooter = $CenterFooter
+    $sh.pageSetup.RightHeader  = $RightFooter 
+    $sh.pageSetup.CenterFooter = $leftFooter
+
+#Set-Excel-Header
+
+# 罫線を使用する前の宣言　(罫線の種類)
+#$LineStyle = "microsoft.office.interop.excel.xlLineStyle" -as [type]
+
+ # 罫線の種類を指定
+#$sheet.cells.item(2,3).borders.LineStyle = $LineStyle::xlDashDotDot
+#$sheet.cells.item(2,3).borders.LineStyle = 1
+<#
+$sh.Range("A1:C3").Borders.LineStyle = 1
+
+$range4=$sh.Range("A1:C3")
+$xlEdgeLeft, $xlEdgeTop, $xlEdgeBottom, $xlEdgeRight | ForEach-Object {
+ $range4.Borders.item($_).LineStyle = $xlLineStyleNone
+}
+
+$range3=$sh.Range("e4:h4")
+$xlEdgeTop, $xlEdgeBottom | ForEach-Object {
+ $range3.Borders.item($_).LineStyle = $xlContinuous
+ $range3.Borders.item($_).Weight = $xlHairline 
+}
+
+$range2=$sh.range("e8:e8")
+$xlEdgeTop, $xlEdgeBottom | ForEach-Object {
+ echo $range2.Borders.item($_).LineStyle
+ echo $range2.Borders.item($_).Weight
+}
+
+$range3 | foreach {
+    echo $_.column
+}
+#>
+
+
+
+ # 罫線を使用する前の宣言　(罫線の太さ)
+#$Weight = "microsoft.office.interop.excel.xlBorderWeight" -as [type]
+
+
+#$sheet.cells.item(2,3).borders.LineStyle = $LineStyle::xlDashDotDot
+
+ # 罫線の太さを指定
+#$sheet.cells.item(2,3).borders.Weight = $Weight::xlMedium
+
+
+    $range1=$sh.range("j1:j20")
+    $range1 | foreach {
+        echo $_.row
+        echo $_.text
+
+        if ($_.text -eq "NW"){
+            $nw_row=$_.row - 1
+        }
+    }
+            $sh.Rows.item($nw_row).Insert() 
+            $range2=$sh.cells.item($nw_row,2)
+            $range3=$sh.cells.item($nw_row,10)
+            $rangeNW=$sh.range($range2,$range3)
+            $xlEdgeTop, $xlEdgeBottom | ForEach-Object {
+                $rangeNW.Borders.item($_).LineStyle = $xlContinuous
+                $rangeNW.Borders.item($_).Weight = $xlHairline 
+            }
+
+<#
+            foreach ($rnw in $rangeNW) {
+                $rnw.cell
+                $nw_nat.add($_,"hoge")
+            }
+#>
+            $sh.cells.item($nw_row,2)=$nw[0]            
+            $sh.cells.item($nw_row,3)=$nw[1]            
+            $sh.cells.item($nw_row,4)=$nw[2]            
+            $sh.cells.item($nw_row,5)=$nw[3]            
+
+
+    $bk.Save()
+    $xl.Quit()
+#ガベージコレクタを動作させる  
+    $xl = $null
+[GC]::Collect() 
+
+}
+
+Function Set-Excel-Header
+{
+    # ヘッダーの設定
+    $sheet.pageSetup.CenterHeader = $CenterHeader
+    $sheet.pageSetup.RightHeader  = $RightHeader
+    $sheet.pageSetup.LeftHeader   = $LeftHeader
+
+    # フッターの設定
+    $sheet.pageSetup.CenterFooter = $CenterFooter
+    $sheet.pageSetup.RightHeader  = $RightFooter 
+    $sheet.pageSetup.CenterFooter = $leftFooter
+}
+
+Function Open-text 
+{
+    Process
+    {
+        Begin 
+        { 
+            $ii=Get-Content C:\Users\pcadmin\Desktop\aaa.txt [0..0]
+        }
+        $f=$(Get-Content C:\Users\pcadmin\Desktop\aaa.txt |select-object -skip 1)
+
+        foreach ($i in $f) 
+        {
+            if ($i.Substring(1,1) -ne  " ") {
+                echo $ii
+            }
+            else
+            {
+                $ii=$ii+$i
+            }
+        } 
+        End
+        {
+            echo $ii
+        }
+    }
+}
+
+$global:nw = @()
+$global:nw_nat = @{}
+
+$nw += "chounai1"
+$nw += "chounai2"
+$nw += "chounai3"
+$nw += "chounai4"
+
+$nw | foreach  {
+   echo $_
+   $nw_nat.add($_,"hoge")
+}
+#$nw
+
+
+Open-Excel
