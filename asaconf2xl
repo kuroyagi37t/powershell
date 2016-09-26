@@ -1,5 +1,7 @@
-[string]$Data_Path = "c:\users\pcadmin\desktop\"
-[string]$Excel_File = "book1.xlsx"
+#Function init_env {
+### 変数定義
+[string]$global:Data_Path = "c:\users\sbs-osaka\desktop\Powershell\scripts"
+[string]$global:Excel_File = "Cisco ASA 5506-x_B子機.xlsx"
 [string]$global:CenterFooter = "Copyright (C) 2016 Internet Initiative Japan Inc.,  All rights reserved."
 [string]$global:RightFooter = ""
 [string]$global:LeftFooter = ""
@@ -7,137 +9,453 @@
 [string]$global:RightHeader = ""
 [string]$global:LeftHeader = ""
 
-
-Function Open-Excel
-{
-
-    # Microsoft.Office.Interop.Excel.XlBorderWeight
-    $xlHairline = 1
-    $xlThin = 2
-    $xlThick = 4
-    $xlMedium = -4138
-
-    # Microsoft.Office.Interop.Excel.XlBordersIndex
-    $xlDiagonalDown = 5
-    $xlDiagonalUp = 6
-    $xlEdgeLeft = 7
-    $xlEdgeTop = 8
-    $xlEdgeBottom = 9
-    $xlEdgeRight = 10
-    $xlInsideVertical = 11
-    $xlInsideHorizontal = 12
-
-    # Microsoft.Office.Interop.Excel.XlLineStyle
-    $xlContinuous = 1
-    $xlDashDot = 4
-    $xlDashDotDot = 5
-    $xlSlantDashDot = 13
-    $xlLineStyleNone = -4142
-    $xlDouble = -4119
-    $xlDot = -4118
-    $xlDash = -4115
-
-    $global:xl = New-Object -ComObject Excel.Application
-    $xl.Visible = $true
-    $global:bk = $xl.Workbooks.Open($Data_Path+$Excel_File)
-    $global:sh = $bk.Worksheets.Item("Sheet1")
-    echo $sh.Cells.Item(4,11).Text
-    echo $("Footer"+$CenterFooter)
-    # ヘッダーの設定
-    $sh.pageSetup.CenterHeader = $CenterHeader
-    $sh.pageSetup.RightHeader  = $RightHeader
-    $sh.pageSetup.LeftHeader   = $LeftHeader
-
-    # フッターの設定
-    $sh.pageSetup.CenterFooter = $CenterFooter
-    $sh.pageSetup.RightHeader  = $RightFooter 
-    $sh.pageSetup.CenterFooter = $leftFooter
-
-#Set-Excel-Header
-
-# 罫線を使用する前の宣言　(罫線の種類)
-#$LineStyle = "microsoft.office.interop.excel.xlLineStyle" -as [type]
-
- # 罫線の種類を指定
-#$sheet.cells.item(2,3).borders.LineStyle = $LineStyle::xlDashDotDot
-#$sheet.cells.item(2,3).borders.LineStyle = 1
-<#
-$sh.Range("A1:C3").Borders.LineStyle = 1
-
-$range4=$sh.Range("A1:C3")
-$xlEdgeLeft, $xlEdgeTop, $xlEdgeBottom, $xlEdgeRight | ForEach-Object {
- $range4.Borders.item($_).LineStyle = $xlLineStyleNone
+### ホスト名一覧
+$global:b_Host = @{
+    "NDS025VRT0100"="中央子ども家庭センター";
+    "NDS030VRT0100"="中央子ども家庭センター 分室１";
+    "NDS031VRT0100"="中央子ども家庭センター 分室２";
+    "NDS026VRT0100"="池田子ども家庭センター";
+    "NDS033VRT0100"="吹田子ども家庭センター";
+    "NDS027VRT0100"="東大阪子ども家庭センター";
+    "NDS009VRT0100"="富田林子ども家庭センター";
+    "NDS028VRT0100"="岸和田子ども家庭センター";
+    "NDS032VRT0100"="池田保健所";
+    "NDS033VRT0200"="吹田保健所";
+    "NDS034VRT0100"="茨木保健所";
+    "NDS035VRT0100"="寝屋川保健所";
+    "NDS036VRT0100"="守口保健所";
+    "NDS037VRT0100"="四條畷保健所";
+    "NDS038VRT0100"="八尾保健所";
+    "NDS039VRT0100"="藤井寺保健所";
+    "NDS040VRT0100"="富田林保健所";
+    "NDS041VRT0100"="和泉保健所";
+    "NDS042VRT0100"="岸和田保健所";
+    "NDS043VRT0100"="泉佐野保健所";
+    "NDS024VRT0100"="女性相談センター";
+    "NDS045VRT0100"="こころの健康総合センター";
+    "NDS022VRT0100"="障がい者 自立相談支援センター";
+    "NSB010VRT0100"="私学課";
+    "NSM026VRT0100"="住宅経営室 経営管理課";
+    "NSM038VRT0100"="府民文化総務課"
 }
 
-$range3=$sh.Range("e4:h4")
-$xlEdgeTop, $xlEdgeBottom | ForEach-Object {
- $range3.Borders.item($_).LineStyle = $xlContinuous
- $range3.Borders.item($_).Weight = $xlHairline 
+$global:a_host = @{
+    "NZE001VRT0100"="税務室本室";
+    "NZE002VRT0100"="税務室分室";
+    "NZE003VRT0100"="中央府税";
+    "NZE004VRT0100"="なにわ北府税事務所";
+    "NZE005VRT0100"="なにわ南府税事務所・大阪自動車税事務所";
+    "NZE006VRT0100"="三島府税事務所";
+    "NZE007VRT0100"="豊能府税事務所";
+    "NZE008VRT0100"="泉北府税事務所";
+    "NZE009VRT0100"="泉南府税事務所";
+    "NZE010VRT0100"="南河内府税事務所";
+    "NZE011VRT0100"="中河内府税事務所";
+    "NZE012VRT0100"="北河内府税事務所";
+    "NZE014VRT0100"="大阪自動車税事務所 寝屋川分室";
+    "NZE015VRT0100"="大阪自動車税事務所 和泉分室";
+    "NZE016VRT0100"="大阪自動車税事務所 なにわ分室";
 }
 
-$range2=$sh.range("e8:e8")
-$xlEdgeTop, $xlEdgeBottom | ForEach-Object {
- echo $range2.Borders.item($_).LineStyle
- echo $range2.Borders.item($_).Weight
+$global:c_host = @{
+    "NBK002VRT0100"="別館2階 IT推進課(税環境テスト用)";
+    "NBK002VRT0200"="別館2階 IT推進課(子家C環境テスト用)";
+    "NHK006VRT0100"="本館6階　地域保健課"
 }
 
-$range3 | foreach {
-    echo $_.column
+### Parse Config 
+$global:ii=@()
+$global:icmp = @()
+[int]$global:icmp_cnt=0
+[int]$nn=0
+[int]$global:nw_cnt=0
+[int]$global:inf_cnt=0
+[int]$global:nat_cnt=0
+$global:inf=[ordered]@{}
+$global:nw=[ordered]@{}
+$global:fw=[ordered]@{}
+$global:fwnat=[ordered]@{}
+$global:nat=[ordered]@{}
+$global:objgrp=[ordered]@{}
+
+### Excel Env
+# Microsoft.Office.Interop.Excel.XlBorderWeight
+$global:xlHairline = 1
+$global:xlThin = 2
+$global:xlThick = 4
+$global:xlMedium = -4138
+
+# Microsoft.Office.Interop.Excel.XlBordersIndex
+$global:xlDiagonalDown = 5
+$global:xlDiagonalUp = 6
+$global:xlEdgeLeft = 7
+$global:xlEdgeTop = 8
+$global:xlEdgeBottom = 9
+$global:xlEdgeRight = 10
+$global:xlInsideVertical = 11
+$global:xlInsideHorizontal = 12
+
+# Microsoft.Office.Interop.Excel.XlLineStyle
+$global:xlContinuous = 1
+$global:xlDashDot = 4
+$global:xlDashDotDot = 5
+$global:xlSlantDashDot = 13
+$global:xlLineStyleNone = -4142
+$global:xlDouble = -4119
+$global:xlDot = -4118
+$global:xlDash = -4115
+
+Function Var_INIT{
+    ### Parse Config 
+    $global:ii=@()
+    $global:icmp = @()
+    [int]$global:icmp_cnt=0
+    [int]$nn=0
+    [int]$global:nw_cnt=0
+    [int]$global:inf_cnt=0
+    [int]$global:nat_cnt=0
+    $global:inf=[ordered]@{}
+    $global:nw=[ordered]@{}
+    $global:fw=[ordered]@{}
+    $global:fwnat=[ordered]@{}
+    $global:nat=[ordered]@{}
+    $global:objgrp=[ordered]@{}
 }
-#>
-
-
-
- # 罫線を使用する前の宣言　(罫線の太さ)
-#$Weight = "microsoft.office.interop.excel.xlBorderWeight" -as [type]
-
-
-#$sheet.cells.item(2,3).borders.LineStyle = $LineStyle::xlDashDotDot
-
- # 罫線の太さを指定
-#$sheet.cells.item(2,3).borders.Weight = $Weight::xlMedium
-
-
-    $range1=$sh.range("j1:j20")
-    $range1 | foreach {
-        echo $_.row
-        echo $_.text
-
-        if ($_.text -eq "NW"){
-            $nw_row=$_.row - 1
+Function get-config-file {
+    Process
+    {
+        ## Config 一覧取得
+        $config_list = Get-ChildItem -Path  (Join-Path $Data_Path "*.txt") -Exclude "*_old.csv","*_OLD.csv"
+        foreach ($configfile in $config_list) {
+            $global:ii=@()
+            Var_INIT
+            Get-Config-data -config $configfile.fullname
+            Parse_config
+            Copy-XL_Sheet
+            Set-XL_page
+            Set-XL-Value
         }
     }
-            $sh.Rows.item($nw_row).Insert() 
-            $range2=$sh.cells.item($nw_row,2)
-            $range3=$sh.cells.item($nw_row,10)
-            $rangeNW=$sh.range($range2,$range3)
-            $xlEdgeTop, $xlEdgeBottom | ForEach-Object {
-                $rangeNW.Borders.item($_).LineStyle = $xlContinuous
-                $rangeNW.Borders.item($_).Weight = $xlHairline 
+}
+Function Get-Config-data {
+    #configファイルを成型
+    # 1バイト目が" "のとき、前の行と連結
+    Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$config
+    )
+    Begin 
+    {
+        $i=$(Get-Content $config | select-object -first 1)
+    }
+    Process
+    {
+        Get-Content $config |select-object -skip 1|foreach  {
+            $dd=$_
+            if ($dd -match '^ ') 
+            {
+                $i=$i+$dd
             }
-
-<#
-            foreach ($rnw in $rangeNW) {
-                $rnw.cell
-                $nw_nat.add($_,"hoge")
+            else
+            {
+                $global:ii+=$i
+                $i=$dd
             }
-#>
-            $sh.cells.item($nw_row,2)=$nw[0]            
-            $sh.cells.item($nw_row,3)=$nw[1]            
-            $sh.cells.item($nw_row,4)=$nw[2]            
-            $sh.cells.item($nw_row,5)=$nw[3]            
+        }
+        $global:ii+=$i
+    }
+}
+Function Open-XL_file {
+    $global:xl = New-Object -ComObject Excel.Application
+    $xl.Visible = $true
+    $global:bk = $xl.Workbooks.Open($(Join-Path $Data_Path $Excel_File ))
+}
+Function Copy-XL_Sheet {
+    ## シート"template"をシート"template"の前にコピー
+    $global:bk.Worksheets.item("template").copy($global:bk.Worksheets.item("template"))
+    $global:bk.Worksheets.Item("template (2)").name = [string]$global:hostname
+    $global:sh = $bk.Worksheets.Item([string]$global:hostname)
+}
+Function Set-XL_page {
+    # ヘッダーの設定
+    $global:sh.pageSetup.CenterHeader = $global:CenterHeader
+    $global:sh.pageSetup.RightHeader  = $global:RightHeader
+    $global:sh.pageSetup.LeftHeader   = $global:LeftHeader
+
+    # フッターの設定
+    $global:sh.pageSetup.CenterFooter = $global:CenterFooter
+    $global:sh.pageSetup.RightHeader  = "Time: &T" 
+    $global:sh.pageSetup.CenterFooter = $global:leftFooter
+}
+Function Set-XL-value {
+    $range1=$sh.range("BA001:BA150")           ###キーワード検索レンジ
+
+    foreach ($kk in $global:inf.keys) {
+        if ($global:inf.$kk.length -gt 0) {
+            if ($global:inf.$kk[2] -eq "CHONAI") {
+                $MNG_IF=$global:inf.$kk[2]
+                $MNG_IP=$global:inf.$kk[2]+"("+$global:inf.$kk[6]+")"
+            }
+            if ($global:inf.$kk[2] -eq "CHONAI_NW_1") {
+                $MNG_IF=$global:inf.$kk[2]
+                $MNG_IP=$global:inf.$kk[2]+"("+$global:inf.$kk[6]+")"
+            }
+        }
+    }
 
 
+    $range1 | foreach {
+        $rr=$_.row
+#        echo $_.text
+        switch -Wildcard ($_.text) 
+        {
+            "HOSTNAME"
+            {
+                $sh.Cells.item($rr,21) = $global:hostname
+            }
+            "BASHO"
+            {
+                if ($global:hostname.Substring(0,3) ="NZE") {
+                    $sh.Cells.item($rr,21) = $global:a_Host.$global:hostname
+                }
+                else
+                {
+                    $sh.Cells.item($rr,21) = $global:b_Host.$global:hostname
+                }
+            }
+            "TITLE"
+            {
+                if ($global:hostname.Substring(0,3) ="NZE") {
+                    $sh.Cells.item($rr,33) = $global:a_Host.$global:hostname
+                }
+                else
+                {
+                    $sh.Cells.item($rr,33) = $global:b_Host.$global:hostname
+                }
+            }
+            "MNG_IP" {
+                $sh.Cells.item($rr,21)=$MNG_IP
+            }
+            "MNG_IF" {
+                $sh.Cells.item($rr,21)=$MNG_IF
+            }
+            "ICMP"
+            {
+                $HRow=$rr
+                if ($sh.Cells.item($rr,21).text -eq "" )
+                {
+                    foreach ($kk in 0..$global:icmp.length) {
+                        $ccc=0
+                        $sh.Cells.item($rr,21) = $global:icmp[$kk]
+                        ##下罫線の設定
+                        Set-Excel_border -Row $rr -BordersIndex $global:xlEdgeBOTTOM -Weight 0 -Style $global:xlLineStyleNone
+                        Set-Excel_border -Row $rr -BordersIndex $global:xlEdgeBOTTOM -Weight $global:xlHairline -col1 21
+                        ##行挿入
+                        $sh.Rows.item($rr+1).Insert()
+                        ++$rr
+                    }
+                    $sh.Rows.item($rr).delete()
+                    --$rr
+                    $sh.Rows.item($rr).delete()
+                    --$rr
+                    ##左罫線の設定
+                    foreach ($cc in 2,3,8,21) {
+                        Set-Excel_border -Row $HRow -Row2 $rr -col1 $cc -col2 $cc -BordersIndex $global:xlEdgeLeft
+                    }
+                    ##右罫線の設定
+                    Set-Excel_border -Row $HRow -Row2 $rr -col1 45 -col2 45 -BordersIndex $global:xlEdgeRight
+                    ##下罫線の設定
+                    Set-Excel_border -Row $rr -BordersIndex $global:xlEdgeBOTTOM
+                }
+            }
+            "IF"
+            {
+                $HRow=$rr
+                $ifno=1
+                $set_col=$($sh.Cells.item($rr,54).text) -split(",")
+                if ($sh.Cells.item($rr,2).text -eq "" )
+                {
+                    foreach ($kk in $global:inf.keys) {
+                        $ccc=0
+                        $sh.Cells.item($rr,2) = [string]$ifno
+                        foreach ($cc in 3,10,13,19,22,25,31,37,42) {
+                            $sh.Cells.item($rr,$cc) = $global:inf.$kk[$ccc]
+                            $ccc++
+                        }    
+                        ##下罫線の設定
+                        Set-Excel_border -Row $rr -BordersIndex $global:xlEdgeBOTTOM -Weight $global:xlHairline 
+                        ##行挿入
+                        $sh.Rows.item($rr+1).Insert()
+                        ++$rr
+                        ++$ifno
+                    }
+                    $sh.Rows.item($rr).delete()
+                    --$rr
+                    ##左罫線の設定
+                    foreach ($cc in 2,3,10,13,19,22,25,31,37,42) {
+                        Set-Excel_border -Row $HRow -Row2 $rr -col1 $cc -col2 $cc -BordersIndex $global:xlEdgeLeft
+                    }
+                    ##右罫線の設定
+                    Set-Excel_border -Row $HRow -Row2 $rr -col1 45 -col2 45 -BordersIndex $global:xlEdgeRight
+                    ##上罫線の設定
+                    Set-Excel_border -Row $($HRow-1) -BordersIndex $global:xlEdgeBOTTOM
+                    ##下罫線の設定
+                    Set-Excel_border -Row $rr -BordersIndex $global:xlEdgeBOTTOM
+                }
+            }
+            "DFGW"
+            {
+                $sh.Cells.item($rr,10) = [string]$global:dfgw
+            }
+            "FW"
+            {
+                $HRow=$rr
+                $set_col=$($sh.Cells.item($rr,54).text) -split(",")
+                if ($sh.Cells.item($rr,2).text -eq "" )
+                {
+                    foreach ($kk in $global:fw.keys) {
+                        $sh.Cells.item($rr,2) =  $kk
+                        $sh.Cells.item($rr,11) = $global:fw.$kk[0]
+                        $sh.Cells.item($rr,14) = $global:fw.$kk[1]
+                        $ccc=0
+                        foreach ($cc in 25,30,33,40,42,44) {
+                            if ($global:fwnat.$kk.length -gt 0)
+                            {
+                                if ([string]$global:fwnat.$kk[$ccc] -match "^[0-9]*$")
+                                {
+                                    $sh.Cells.item($rr,$cc) = "=text("+[string]$global:fwnat.$kk[$ccc]+",0)"
+                                }
+                                else
+                                {
+                                    $sh.Cells.item($rr,$cc) = $global:fwnat.$kk[$ccc]
+                                }
+                            }
+                            $ccc++
+                        }    
+                        ##下罫線の設定
+                        Set-Excel_border -Row $rr -BordersIndex $global:xlEdgeBOTTOM -Weight $global:xlHairline 
+                        ##行挿入
+                        $sh.Rows.item($rr+1).Insert()
+                        ++$rr
+                    }
+                    $sh.Rows.item($rr).delete()
+                    --$rr
+                    ##左罫線の設定
+                    foreach ($cc in 2,11,14,25,30,33,40,42,44) {
+                        Set-Excel_border -Row $HRow -Row2 $rr -col1 $cc -col2 $cc -BordersIndex $global:xlEdgeLeft
+                    }
+                    ##右罫線の設定
+                    Set-Excel_border -Row $HRow -Row2 $rr -col1 45 -col2 45 -BordersIndex $global:xlEdgeRight
+                    ##上罫線の設定
+                    Set-Excel_border -Row $($HRow-1) -BordersIndex $global:xlEdgeBOTTOM
+                    ##下罫線の設定
+                    Set-Excel_border -Row $rr -BordersIndex $global:xlEdgeBOTTOM
+                }
+            }
+            "NWGRP"
+            {
+                $HRow=$rr
+                foreach ($kk in $global:objgrp.keys) {
+                    $sh.Cells.item($rr,2) = $kk
+                    Set-Excel_border -Row $rr -BordersIndex $global:xlEdgeTOP
+                    foreach ($cc in 1..$global:objgrp.$kk.length) {
+                        $sh.Cells.item($rr,11) = $global:objgrp.$kk[$cc]
+                        ##下罫線の設定
+                        Set-Excel_border -Row $rr -col1 11 -BordersIndex $global:xlEdgeBOTTOM -Weight $global:xlHairline 
+                        ##行挿入
+                        ++$rr
+                        $sh.Rows.item($rr+1).Insert()
+                    }
+                    $sh.Rows.item($rr).delete()
+                    --$rr
+                }
+                $sh.Rows.item($rr).delete()
+                --$rr
+                ##左罫線の設定
+                foreach ($cc in 2,11,25) {
+                    Set-Excel_border -Row $HRow -Row2 $rr -col1 $cc -col2 $cc -BordersIndex $global:xlEdgeLeft
+                }
+                ##右罫線の設定
+                Set-Excel_border -Row $HRow -Row2 $rr -col1 45 -col2 45 -BordersIndex $global:xlEdgeRight
+                ##下罫線の設定
+                Set-Excel_border -Row $rr -BordersIndex $global:xlEdgeBOTTOM
+            }
+            "NAT"
+            {
+                $HRow=$rr
+                $set_col=$($sh.Cells.item($rr,54).text) -split(",")
+                if ($sh.Cells.item($rr,2).text -eq "" )
+                {
+                    foreach ($kk in $global:nat.keys) {
+                        $ccc=0
+                        foreach ($cc in 2,8,11,17,21,28,35,38,42) {
+                            $sh.Cells.item($rr,$cc) = $global:nat.$kk[$ccc]
+                            $ccc++
+                        }    
+                        ##下罫線の設定
+                        Set-Excel_border -Row $rr -BordersIndex $global:xlEdgeBOTTOM -Weight $global:xlHairline 
+                        ##行挿入
+                        $sh.Rows.item($rr+1).Insert()
+                        ++$rr
+                    }
+                    ##左罫線の設定
+                    --$rr
+                    foreach ($cc in 2,8,11,17,21,28,35,38,42) {
+                        Set-Excel_border -Row $HRow -Row2 $rr -col1 $cc -col2 $cc -BordersIndex $global:xlEdgeLeft
+                    }
+                    ##右罫線の設定
+                    Set-Excel_border -Row $HRow -Row2 $rr -col1 45 -col2 45 -BordersIndex $global:xlEdgeRight
+                    ##上罫線の設定
+                    Set-Excel_border -Row $($HRow-1) -BordersIndex $global:xlEdgeBOTTOM
+                    ##下罫線の設定
+                    Set-Excel_border -Row $rr -BordersIndex $global:xlEdgeBOTTOM
+                }
+            }
+        }
+    }
     $bk.Save()
-    $xl.Quit()
+}
+Function Close-XL_file {
+    $global:xl.Quit()
 #ガベージコレクタを動作させる  
-    $xl = $null
-[GC]::Collect() 
-
+    $global:xl = $null
+    [GC]::Collect() 
+}
+Function Set-Excel_border {
+    [OutputType([string])]
+    [CmdletBinding()]
+    Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        $Row,
+        [Parameter(Mandatory=$True,Position = 1)]
+        $BordersIndex,
+        [Parameter(Mandatory=$False,Position = 2)]
+        $Style=$global:xlContinuous,
+        [Parameter(Mandatory=$False,Position = 3)]
+        $Weight=$global:xlThin,
+        [Parameter(Position = 4)]
+        $row2=0,
+        [Parameter(Position = 5)]
+        $col1=2,
+        [Parameter(Position = 6)]
+        $col2=45
+    )
+    Process 
+    {
+        if ($row2 -eq 0){$row2=$row}
+        $range1=$global:sh.cells.item($Row,$col1)
+        $range2=$global:sh.cells.item($Row2,$col2)
+        $rangeBORDER=$global:sh.range($range1,$range2)
+        $rangeBORDER.Borders.item($BordersIndex).LineStyle = $Style
+        if ($Weight -ne 0){
+            $rangeBORDER.Borders.item($BordersIndex).Weight = $Weight
+        }
+    }
 }
 
-Function Set-Excel-Header
-{
+Function Set-Excel-Header {
     # ヘッダーの設定
     $sheet.pageSetup.CenterHeader = $CenterHeader
     $sheet.pageSetup.RightHeader  = $RightHeader
@@ -148,47 +466,302 @@ Function Set-Excel-Header
     $sheet.pageSetup.RightHeader  = $RightFooter 
     $sheet.pageSetup.CenterFooter = $leftFooter
 }
-
-Function Open-text 
-{
+Function calc_subnet　{
+    [OutputType([string])]
+    [CmdletBinding()]
+    Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$ip,
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$subnet
+    )
     Process
     {
-        Begin 
-        { 
-            $ii=Get-Content C:\Users\pcadmin\Desktop\aaa.txt [0..0]
+        $Mask = $Subnet.split(".")
+        $CIDR = [int] 0
+        $Octet = [int]0
+        Foreach ($Octet in $Mask){
+            if ($Octet -eq 255){$CIDR += 8}
+            if ($Octet -eq 254){$CIDR += 7}
+            if ($Octet -eq 252){$CIDR += 6}
+            if ($Octet -eq 248){$CIDR += 5}
+            if ($Octet -eq 240){$CIDR += 4}
+            if ($Octet -eq 224){$CIDR += 3}
+            if ($Octet -eq 192){$CIDR += 2}
+            if ($Octet -eq 128){$CIDR += 1}
         }
-        $f=$(Get-Content C:\Users\pcadmin\Desktop\aaa.txt |select-object -skip 1)
+    return $CIDR
+    }
+}
+Function Parse-interface {
+    Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$i,
+        [Parameter(Mandatory=$True,Position = 1)]
+        [string]$ff
+    )
+    Process
+    {
+        $inf_if=""
+        $inf_ifno=""
+        $inf_ip=""
+        $inf_shtdwn=""
+        $inf_nameif=""
+        $if_mode=""
+        $inf_seclv=""
+        $j=$i -replace " no "," no@"    
+        $r0_r='$1'
+        $r1_r='$2'
+        $r0='^interface (.*)([0-9]/[0-9]) .*'
+        $inf_if=$j -Replace $r0,$r0_r
+        $inf_ifno="'"+$($j -Replace $r0,$r1_r)
+        switch -Wildcard ($j) {
+            "* no@ip *" {
+                $inf_shtdwn="-"
+                $inf_nameif="-"
+                $inf_ip="-"
+                $if_mode="-"
+                $inf_seclv="-"
+            }
+            default {
+                $r0='.* ip address ([1-2].*) ([1-2].*)'
+                $inf_ip=$j -Replace $r0,$r0_r
+                $r1_r='$2'
+                $inf_subnet=$j -Replace $r0,$r1_r
+                $inf_mask="/"+$(calc_subnet -ip $inf_ip -subnet $inf_subnet)
 
-        foreach ($i in $f) 
-        {
-            if ($i.Substring(1,1) -ne  " ") {
-                echo $ii
+                $r0='.* nameif (.*) sec.*'
+                $inf_nameif=$j -Replace $r0,$r0_r
+
+                $r0='.* security-level ([0-9]*) ip.*'
+                $inf_seclv=$j -Replace $r0,$r0_r
+
+                $r0_r='-'
+                $r0='.*no@shutdown.*'
+                $inf_shtdwn="-"
+                $if_mode="access"
             }
-            else
+        }
+        $global:inf.add($ff,@($inf_if,$inf_ifno,$inf_nameif,$if_mode,"-",$inf_seclv,$inf_ip,$inf_mask,$inf_shtdwn))
+    }
+}
+Function Parse-icmp {
+    Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$i
+    )
+    Process
+    {
+        $r0='icmp permit any '
+        $r0_r=''
+        return $i -Replace $r0,$r0_r
+    }
+}
+Function Parse-object{
+    Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$i
+    )
+    Process
+    {
+        $r0_r='$1'
+        $r0='^object network (.*) [h|s|r].*$'
+        $nw = $($i -Replace $r0,$r0_r)
+
+        switch -Wildcard ($i) 
+        {
+            "* host *" 
             {
-                $ii=$ii+$i
+                $r0='^.*host (.*)$'
+                $nw_type="host"
+                $nw_address=$i -Replace $r0,$r0_r
             }
-        } 
-        End
+            "* range *" 
+            {
+                $r0='^.*range (.*) .*$'
+                $r1='^.*range .* (.*)$'
+                $nw_type="range"
+                $nw_address=$($i -Replace $r0,$r0_r)+"-"+$($i -Replace $r1,$r0_r)
+            }
+            "* subnet *" 
+            {
+                $r0='^.*subnet (.*) .*$'
+                $r1='^.*subnet .* (.*)$'
+                $nw_type="subnet"
+                $nw_address=$i -Replace $r0,$r0_r
+                $nw_subnet=$i -Replace $r1,$r0_r
+                $nw_mask=calc_subnet -ip $nw_address -subnet $nw_subnet
+                $nw_address=$($nw_address + "/" + $nw_mask)
+            }
+        }
+        $global:fw.add($nw,@($nw_type,$nw_address))
+    }    
+}
+Function Parse-object-nw-nat {
+    Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$i
+    )
+    Process
+    {
+        $r0_r='$1'
+        $r0='^object network (.*) nat.*$'
+        $nw = $($i -Replace $r0,$r0_r)
+
+        $r0='^.*nat \((.*),.*$'
+        $nw_rIF=$i -Replace $r0,$r0_r
+
+        $r0='^.*,(.*)\) .*$'
+        $nw_mIF=$i -Replace $r0,$r0_r
+
+        $r0='^.* static (.*) service.*$'
+        $nw_s=$i -Replace $r0,$r0_r
+
+        switch -Wildcard ($i) 
         {
-            echo $ii
+            "* udp *" 
+            {
+                $nw_proto="udp"
+            }
+            "* tcp *" 
+            {
+                $nw_proto="tcp"
+            }
+        }
+
+        $r0='^.* service .*p ([0-9]*) .*$'
+        $nw_rPort=$i -Replace $r0,$r0_r
+
+        $r0='^.* service .*p [0-9]* ([0-9]*)$'
+        $nw_mPort=$i -Replace $r0,$r0_r
+
+        $global:fwnat.add($nw,@($nw_rif,$nw_mif,$nw_s,$nw_proto,$nw_mport,$nw_rport))
+    }
+}
+Function Parse-object-group {
+    Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$i
+    )
+    Process
+    {
+        $r0_r='$1'
+        $r0='^object-group network ([a-zA-Z-]*) network.*$'
+        $grp=$i -Replace $r0,$r0_r
+        $r0=' network-object object '
+        $r0_r=' '
+        $r1='^object-group network [a-zA-Z-]* '
+        $r1_r=''
+        $r2=' '
+        $r2_r=','
+        $global:objgrp.add($grp,$($($($i -Replace $r0,$r0_r) -replace $r1,$r0_r) -replace $r2,$r2_r).split(","))
+    }
+}
+Function Parse-nat {
+    Param
+    (
+        [Parameter(Mandatory=$True,Position = 0)]
+        [String]$i,
+        [Parameter(Mandatory=$True,Position = 1)]
+        [String]$nn
+    )
+    Process
+    {
+
+        $r0_r='$1'
+        $r0='^nat \((.*),.*$'
+        $nat_rif=$i -Replace $r0,$r0_r
+        $r0='^nat .*,(.*)\) .*$'
+        $nat_mif=$i -Replace $r0,$r0_r
+
+        $r0='^.* source dynamic (.*) interface .*$'
+        $nat_s = $i -Replace $r0,$r0_r
+
+        $r0='^.* (.*) destination .*$'
+        $nat_sif=$i -Replace $r0,$r0_r
+
+        $r0='^.* static (.*) .* service.*$'
+        $nat_mobj=$i -Replace $r0,$r0_r
+
+        $r0='^.* static .* (.*) service.*$'
+        $nat_robj=$i -Replace $r0,$r0_r
+
+        switch -Wildcard ($i) 
+        {
+            "*UDP*"  { $nat_proto="udp" }
+            "*TCP*"  { $nat_proto="tcp" }
+            default  { $nat_proto="tcp" }
+        }
+
+        $r0='^.* service (.*) .*$'
+        $nat_mport=$i -Replace $r0,$r0_r
+
+        $r0='^.* service .* (.*)$'
+        $nat_rport=$i -Replace $r0,$r0_r
+
+        $global:nat.add($nn,@($nat_rif,$nat_mif,$nat_s,$nat_sif,$nat_mobj,$nat_robj,$nat_proto,$nat_mport,$nat_rport))
+#        echo $global:nat.$nn
+    }    
+}
+Function Parse_config {
+     foreach ($iii in $global:ii) {
+        switch -Wildcard ($iii) {
+            "hostname *" {
+                $r0_r='$1'
+                $r0='^hostname (.*)$'
+                $global:hostname=$iii -Replace $r0,$r0_r
+            }
+            "route *" {
+                $r0_r='$1'
+                $r0='^route .* 0.* 0.* ([1-2].*) 1$'
+                $global:dfgw=$iii -Replace $r0,$r0_r
+            }
+            "interface *" {
+                parse-interface -i $iii -ff $global:inf_cnt
+                $global:inf_cnt++
+ #               echo $iii
+            }
+            "object-group *" {
+                Parse-object-group -i $iii
+#                echo $iii
+            }
+            "icmp permit *" {
+                $global:icmp+=Parse-icmp $iii
+#                echo $iii
+            }
+            "object network *" {
+                switch -Wildcard ($iii) {
+                    "* nat *" {
+                        Parse-object-nw-nat -i $iii
+                    }
+                    "* subnet *" {
+                        parse-object -i $iii
+                    }
+                    "* range *" {
+                        parse-object -i $iii
+                    }
+                    "* host *" {
+                        parse-object -i $iii
+                    }
+                }
+            }
+            "nat *" {
+                Parse-nat -i $iii -nn $global:nat_cnt
+                $global:nat_cnt++
+#                echo $global:nat_cnt
+#                echo $iii
+            }
         }
     }
 }
 
-$global:nw = @()
-$global:nw_nat = @{}
+Open-XL_file
+get-config-file
+Close-XL_file
 
-$nw += "chounai1"
-$nw += "chounai2"
-$nw += "chounai3"
-$nw += "chounai4"
-
-$nw | foreach  {
-   echo $_
-   $nw_nat.add($_,"hoge")
-}
-#$nw
-
-
-Open-Excel
