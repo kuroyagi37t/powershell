@@ -1,0 +1,208 @@
+Import-Module .\SSH-Sessions\SSH-Sessions
+#Import the PowerCLI module
+Add-PSSnapin VMware.VimAutomation.Core
+
+$Env:Path += ";"+$(join-path "c:\Script" "ipmiutil")
+[string]$vCenterIP = "150.89.164.10"                        ### vCenterIP 
+[string]$User = "vcadmin"                                   ### vCenter Login ID 
+[string]$Password = "password"                              ### vCenter Login Password 
+[string]$SKIP_Prefix = "^[u|N][-|T][a|N][d|X][d|-][s|1]*"   ### Shutdown VM Step:1 Skip VM Prefix u-adds or NTNX-1
+[string]$AD_Prefix = "^u-ad*"                               ### Shutdown VM AD Server Prefix
+[string]$CVM_Prefix = "^NTNX-*"                             ### Shutdown VM NTNX cvm Prefix 
+[string]$ESXiUser = "root"                                  ### ESXi Login ID 
+[string]$sleeptimer = 10                                    ### VM Shutdown Timer
+[string]$SSH_user= "nutanix"                                ### NTNX CVM Login ID
+[string]$SSH_pass= "nutanix/4u"                             ### NTNX CVM Login Password
+[string]$SSH_Server = "150.89.164.111"                      ### NTNX CVM Host IP
+[string]$ssh_port= "22"    
+[string]$Global:IPMI_User="ADMIN"
+[string]$Global:IPMI_Pass="password"
+[string]$Global:PingTimeOut=5000    # Time Out [ms]
+[string]$Global:PingCount=60        # 5000ms x 60 = 5[sec]x 60 =300[sec] = 5[min]
+[string]$Global:NTNX_Start_cmd="/home/nutanix/cluster/bin/cluster start"
+[string]$Global:NTNX_Status_cmd="/home/nutanix/cluster/bin/cluster status 2>&1|grep state"
+$IPMI_LIST="150.89.164.101","150.89.164.102","150.89.164.103"
+$ESXi_LIST="150.89.164.11","150.89.164.12","150.89.164.13"
+$CVM_LIST="150.89.164.111","150.89.164.112","150.89.164.113"
+
+
+$timestamp={Get-Date -Format "yyyyMMdd-HHmmss"}
+$SDate=$timestamp.Invoke()
+[string]$CR="`n"
+[string]$CRLF="`r`n"
+
+# 詳細ログファイルパス
+if(!$LogFile){ [string]$global:LogFile = "./Logs/ScriptLog_"+$(Get-Date -Format "yyyyMMdd-HHmmss")+".log" }
+# イベントログソース名
+if(!$EvevtSource){ [string]$global:EvevtSource = "IIJ_SCRIPT StartUP VM Guest"}
+
+
+#-----------------------------------------------
+# Logメソッド
+# エラーメッセージログ吐き出し用メソッド
+Function Message-ErrorLogFile ([String]$Message = ""){
+    if($Message -ne ""){
+        "Time : $(Get-Date -Format "yyyy/MM/dd HH:mm:ss")" | Out-File -encoding UTF8 -FilePath $LogFile -Append
+        "ErrorMessage : $($Message)" | Out-File -encoding UTF8 -FilePath $LogFile -Append
+        Write-Host $Message
+    }
+    $Error | Out-File -encoding UTF8 -FilePath $LogFile -Append
+    $Error.Clear()
+}
+# インフォメッセージログ吐き出し用メソッド
+Function Message-LogFile ([String]$Message = ""){
+    if($Message -ne ""){
+        "Time : $(Get-Date -Format "yyyy/MM/dd HH:mm:ss")" | Out-File -encoding UTF8 -FilePath $LogFile -Append
+        "InfoMessage : $($Message)" | Out-File -encoding UTF8 -FilePath $LogFile -Append
+    }
+}
+# メッセージボックスポップアップ用メソッド
+Function Message-Popup ([String]$Message = "",[String]$Title = "ScriptMessage"){
+    Add-Type -Assembly System.Windows.Forms
+    [System.Windows.Forms.MessageBox]::Show($Message, $Title)
+}
+
+# イベントログ発行用メソッド
+Function Message-EventLog ([String]$Message,[String]$Type = "Information", [int]$ID = 0, [String]$Source = $EvevtSource){
+    if ([System.Diagnostics.EventLog]::SourceExists($Source) -eq $false){
+        New-EventLog -LogName Application -Source $Source
+    }
+    Write-EventLog -LogName Application -EntryType $Type -Source $Source -EventId $ID -Message $Message
+}
+
+Function SendPing{
+    Param(
+        $PingHost
+    )
+    $Ping = new-object System.Net.Networkinformation.Ping
+    $i=0
+    do{
+        $rt=$ping.send($PingHost,$Global:PingTimeOut);
+        Write-Host "." -NoNewline
+        sleep 1
+        $i++
+    } Until (($RT.status -eq "Success") -or ($i -gt $Global:PingCount))
+}
+
+Function PowerON-VM ([string]$vm) {
+    $GetVM = Get-VM $vm
+    if ($GetVM.PowerState -eq "PoweredOff") {
+        Start-VM $vm  -RunASync |Out-Null
+        Write-Host "VM:$($vm) is Start-VMGuest"
+        Message-LogFile "VM:$($GetVM.VMHost)上の$($vm)へPowerONを開始しました。 ($($LogFile))."
+        Message-EventLog  -Message "VM:$($GetVM.VMHost)上の$($vm)へPowerONを開始しました。"　-ID 1
+<#
+        do {
+            Start-sleep $sleeptimer
+            Write-Host "Waiting for VM Start"
+            $VMInfo = Get-VM $vm
+            $GuestIP = $VMInfo.Guest.IPAddress
+        }
+        until ($GuestIP)
+#>
+    }  
+}
+Function Start-NTNX-Cluster {
+    Begin {
+        $i=0
+    	Do {
+    		Write-Host "SSH Connect Try to CVM("$SSH_Server")---"$i"0/600 Sec"		
+	        $RT=New-SshSession -ComputerName $SSH_Server -Username $SSH_User -Password $SSH_Pass -Port $SSH_Port
+	    	Start-Sleep 10
+            $i++
+	    } Until (($RT -eq 'Successfully connected to 150.89.164.111') -or ($i -gt 60))
+        Message-LogFile $RT.replace($CR,$CRLF)
+    }
+	Process	{
+        Try {
+            $RT=Invoke-SSHCommand  -ComputerName $SSH_Server -Command $NTNX_Status_cmd
+            If ($RT -eq 'The state of the cluster: stop')  {
+                $RT=Invoke-SSHCommand  -ComputerName $SSH_Server -Command $NTNX_Start_cmd
+            }
+            Message-LogFile $RT.replace($CR,$CRLF)
+            Message-EventLog  -Message $RT.replace($CR,$CRLF) -ID 1
+            $i=0
+            do{
+                $RT=Invoke-SSHCommand  -ComputerName $SSH_Server -Command $NTNX_Status_cmd
+                Write-Host "." -NoNewline
+                Start-sleep 1
+                $i++
+            } Until (($RT -eq 'The state of the cluster: start') -or ($i -gt 60))
+            if ($RT -eq 'The state of the cluster: start') {
+                Message-EventLog -Message $RT.replace($CR,$CRLF) -ID 1
+                Start-sleep 10
+
+            }
+        }
+        Catch {
+            Message-ErrorLogFile $RT.replace($CR,$CRLF)
+        }
+    }
+    End {
+        $RT=Remove-SshSession -ComputerName $SSH_Server
+        Message-LogFile $RT.replace($CR,$CRLF)
+    }
+}
+
+#Use ipmiutil to power on the hosts (power -u)
+foreach ($IPMIHost in $IPMI_LIST) {
+    ipmiutil power -u -N $IPMIHost -U $IPMI_User -P $IPMI_Pass
+    Message-LogFile "$($IPMIHost)をPowerONしました。 ($($LogFile))."
+    Message-EventLog  -Message "$($IPMIHost)を電源投入しました。" -ID 1
+}
+
+foreach ($VMHost in $ESXi_LIST) {
+	Write-Host "Ping Wait "$VMHost
+        SendPing $VMHost
+}
+
+Write-Host "Please Wait 60 Sec ESXi Starting..." 
+Start-sleep 60 
+
+foreach ($VMHost in $ESXi_LIST) {
+	do {
+		$vi = Connect-VIServer -Server $VMHost -User $ESXiUser -Password $Password
+		Write-Host "Connection Wait 10 Sec "$VMHost
+		Disconnect-VIServer -Server $VMHost -Confirm:$False
+		Start-sleep 10
+	}
+	until ($vi.name -eq $VMHost) 	
+}
+
+
+#Connect to the server
+$vi = Connect-VIServer -Server $vCenterIP -User $User -Password $Password
+
+### VMHost を メンテナンスモードを終了
+ForEach ($VMHost in $(Get-VMHost | Select Name | Sort-object Name)) {
+    Get-VMHost -Name $VMHost.name  | Set-VMHost -State Connected
+    Message-LogFile "$($VMHost.name)をメンテナンスモードを終了しました。 ($($LogFile))."
+    Message-EventLog  -Message "$($VMHost.name)をメンテナンスモードを終了しました。" -ID 1
+}
+
+### $CVM_PrefixのVMを起動
+ForEach ($vm in $(Get-VM | Where{($_.Name -cmatch $CVM_Prefix)} | Select Name | Sort-object Name)) {    
+    PowerON-VM -vm $vm.name
+}
+
+foreach ($CVM in $CVM_LIST) {
+    SendPing $CVM
+}
+
+Write-Host "Please Wait 60 Sec Nutanix CVM Starting ...."
+Start-sleep 60 
+Write-Host "Nutanix Cluster Starting..."
+Start-NTNX-Cluster
+
+### $AD_PrefixのVMを起動
+ForEach ($vm in $(Get-VM | Where{($_.Name -cmatch $AD_Prefix)} | Select Name | Sort-object Name)) {
+    PowerON-VM -vm $vm.name
+}
+
+## $SKIP_Prefix以外のVMを起動
+ForEach ($vm in $(Get-VM | Where{!($_.Name -cmatch $SKIP_Prefix)} | Select Name | Sort-object Name)) {
+    PowerON-VM -vm $vm.name
+}
+
+
+Disconnect-VIServer -Server $vCenterIP -Confirm:$False 
