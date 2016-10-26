@@ -1,0 +1,162 @@
+Import-Module .\SSH-Sessions
+#Import the PowerCLI module
+Add-PSSnapin VMware.VimAutomation.Core
+
+#  Connect-VIServer の証明書 Check Skip 
+#  Set-PowerCLIConfiguration -InvalidCertificateAction Ignore 
+
+[string]$vCenterIP = "150.89.164.10"                        ### vCenterIP 
+[string]$User = "vcadmin"                                   ### vCenter Login ID 
+[string]$Password = "password03mos9K&1g"                            ### vCenter Login Password 
+[string]$SKIP_Prefix = "^[u|N][-|T][a|N][d|X][d|-][s|1]*"   ### Shutdown VM Step:1 Skip VM Prefix u-adds or NTNX-1
+[string]$AD_Prefix = "^u-ad*"                               ### Shutdown VM AD Server Prefix
+[string]$CVM_Prefix = "^NTNX-*"                             ### Shutdown VM NTNX cvm Prefix 
+[string]$sleeptimer = 10                                    ### VM Shutdown Timer
+[string]$SSH_user= "nutanix"                                ### NTNX CVM Login ID
+[string]$SSH_pass= "nutanix/4u"                             ### NTNX CVM Login Password
+[string]$SSH_Server = "150.89.164.111"                      ### NTNX CVM Host IP
+[string]$ssh_port= "22"                                     ### NTNX CVM SSH Port  
+[string]$ssh_cmd= "source /etc/profile.d/nutanix_env.sh;source /etc/profile.d/zookeeper_env.sh;echo y |cluster stop" ### NTNX CVM Cluster Shutdown CMD 
+
+$timestamp=$(Get-Date -Format "yyyyMMdd-HHmmss")
+[string]$CR="`n"
+[string]$CRLF="`r`n"
+
+# 詳細ログファイルパス
+if(!$LogFile){ [string]$global:LogFile = "./Logs/ScriptLog_"+$(Get-Date -Format "yyyyMMdd-HHmmss")+".log" }
+# イベントログソース名
+if(!$EvevtSource){ [string]$global:EvevtSource = "IIJ_SCRIPT Shutdown VM Guest"}
+
+#-----------------------------------------------
+# Logメソッド
+# エラーメッセージログ吐き出し用メソッド
+Function Message-ErrorLogFile ([String]$Message = ""){
+    if($Message -ne ""){
+        "Time : $(Get-Date -Format "yyyy/MM/dd HH:mm:ss")" | Out-File -encoding UTF8 -FilePath $LogFile -Append
+        "ErrorMessage : $($Message)" | Out-File -encoding UTF8 -FilePath $LogFile -Append
+        Write-Host $Message
+    }
+    $Error | Out-File -encoding UTF8 -FilePath $LogFile -Append
+    $Error.Clear()
+}
+# インフォメッセージログ吐き出し用メソッド
+Function Message-LogFile ([String]$Message = ""){
+    if($Message -ne ""){
+        "Time : $(Get-Date -Format "yyyy/MM/dd HH:mm:ss")" | Out-File -encoding UTF8 -FilePath $LogFile -Append
+        "InfoMessage : $($Message)" | Out-File -encoding UTF8 -FilePath $LogFile -Append
+    }
+}
+# メッセージボックスポップアップ用メソッド
+Function Message-Popup ([String]$Message = "",[String]$Title = "ScriptMessage"){
+    Add-Type -Assembly System.Windows.Forms
+    [System.Windows.Forms.MessageBox]::Show($Message, $Title)
+}
+
+# イベントログ発行用メソッド
+Function Message-EventLog ([String]$Message,[String]$Type = "Information", [int]$ID = 0, [String]$Source = $EvevtSource){
+    if ([System.Diagnostics.EventLog]::SourceExists($Source) -eq $false){
+        New-EventLog -LogName Application -Source $Source
+    }
+    Write-EventLog -LogName Application -EntryType $Type -Source $Source -EventId $ID -Message $Message
+}
+
+Function Shutdown-VM ([string]$vm) {
+    $GetVM = Get-VM $vm
+    if ($GetVM.PowerState -ne "PoweredOff") {
+        if ($(Get-VMGuest $GetVM.Name).ToolsVersion -ne 0) {  
+            stop-VMGuest $vm -Confirm:$false |Out-Null
+            Write-Host "VM:$($vm) is Stop-VMGuest"
+            Message-LogFile "VM:$($GetVM.VMHost)上の$($vm)へシャットダウンを開始しました。 ($($LogFile))."
+            Message-EventLog -Message "VM:$($GetVM.VMHost)上の$($vm)へシャットダウンを開始しました。"　-ID 1
+            Start-sleep $sleeptimer
+        }  
+        else {  
+            Stop-VM $vm -Confirm:$false |Out-Null
+            Write-Host "VM:$($vm) is Stop-VM"
+            Message-LogFile "VM:$($GetVM.VMHost)上の$($vm)は、VMware toolsがインストールされていません。 ($($LogFile))."
+            Message-LogFile "VM:$($GetVM.VMHost)上の$($vm)へ Stop-VM を開始しました。 ($($LogFile))."
+            Message-EventLog  -Message "VM:$($GetVM.VMHost)上の$($vm)へ Stop-VM を開始しました。"　-ID 1
+            Start-sleep $sleeptimer
+        }  
+    }  
+}
+
+Function Stop-NTNX-Cluster {
+    Begin {
+        $RT=New-SshSession -ComputerName $SSH_Server -Username $SSH_User -Password $SSH_Pass -Port $SSH_Port
+        Message-LogFile $RT.replace($CR,$CRLF)
+    }
+	Process	{
+        Try {
+            $RT=Invoke-SSHCommand  -ComputerName $SSH_Server -Command $ssh_cmd
+            Message-LogFile $RT.replace($CR,$CRLF)
+            Message-EventLog -Category "Nutanix cvm Cluster is shutdown" -Message $RT.replace($CR,$CRLF) -ID 1
+        }
+        Catch {
+            Message-ErrorLogFile $RT.replace($CR,$CRLF)
+        }
+    }
+    End {
+        $RT=Remove-SshSession -ComputerName $SSH_Server
+        Message-LogFile $RT.replace($CR,$CRLF)
+    }
+}
+
+#Connect to the server
+$vi = Connect-VIServer -Server $vCenterIP -User $User -Password $Password
+
+#Power off the VMs
+### $SKIP_Prefix以外のVMをシャットダウン
+ForEach ($vm in $(Get-VM | Where{!($_.Name -cmatch $SKIP_Prefix)} | Select Name | Sort-object -Descending Name)) {
+    shutdown-vm -vm $vm.name
+}
+### $AD_PrefixのVMをシャットダウン
+ForEach ($vm in $(Get-VM | Where{($_.Name -cmatch $AD_Prefix)} | Select Name | Sort-object -Descending Name)) {
+    shutdown-vm -vm $vm.name
+}
+### PowerOff していないVMをWait Max 600 Sec
+$i=0
+Do {
+    $RT=$(get-vm |where {!($_.Name -cmatch $CVM_Prefix)} |where {($_.PowerState -eq "PoweredOn")})
+    Message-LogFile "VM:$($GetVM.VMHost)上の$($vm)へ Stop-VM を開始しました。 ($($LogFile))."
+    Write-Host "---- Not PowerOffed VMs -----"$i"0/600 sec"
+    Write-Host $RT
+    Start-sleep 10
+    $i++
+} Until (($RT.count -eq 0) -or ($i -gt 60 ))
+
+
+
+Stop-NTNX-Cluster
+
+### $CVM_PrefixのVMをシャットダウン
+ForEach ($vm in $(Get-VM | Where{($_.Name -cmatch $CVM_Prefix)} | Select Name | Sort-object Name)) {    
+    shutdown-vm -vm $vm.name
+}
+
+### VMHost を メンテナンスモード
+ForEach ($VMHost in $(Get-VMHost | Select Name | Sort-object Name)) {
+    Get-VMHost -Name $VMHost.name | Set-VMHost -State Maintenance    
+    Start-sleep $sleeptimer
+    Message-LogFile "$($VMHost.name)をメンテナンスモードに変更しました。 ($($LogFile))."
+    Message-EventLog -Category "Host:$($VMHost.name) into Maintenance Mode" -Message "$($VMHost.name)をメンテナンスモードに変更しました。" -ID 1
+}
+
+#exit
+
+
+
+### VMHost を Shutdown 
+ForEach ($VMHost in $(Get-VMHost | Select Name | Sort-object Name)) {
+    Stop-VMHost $VMHost.name -Force:$true  -Confirm:$false
+    Start-sleep $sleeptimer
+    Message-LogFile "Host:$($VMHost.name)のシャットダウンを開始しました。 ($($LogFile))."
+    Message-EventLog -Category "Host:$($VMHost.name) is shutdown" -Message "Host:$($VMHost.name)のシャットダウンを開始しました。" -ID 1
+}
+
+#Disconnect to the server
+Disconnect-VIServer -Server $vCenterIP -Confirm:$False 
+
+## Shutdown vCenter
+##Stop-Computer -force
+
