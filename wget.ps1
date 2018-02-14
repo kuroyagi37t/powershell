@@ -1,7 +1,9 @@
 Invoke-WebRequest -uri https://go.microsoft.com/fwlink/?LinkId=746572 -outfile vc_redist.x64.exe
 Invoke-WebRequest -uri https://drive.google.com/file/d/0B9lIUVILRCwvaS1kS1BoQlFsbGc/view?usp=sharing -outfile lhaz64_251.exe
 Invoke-WebRequest -uri http://www5f.biglobe.ne.jp/~t-susumu/dl/tpad/tpad109.exe -outfile tpad109.exe
+Invoke-WebRequest -uri https://ja.osdn.net/projects/ttssh2/downloads/68719/teraterm-4.97.exe/ -Outfile teraterm-4.97.exe
 Invoke-WebRequest -uri https://download.sysinternals.com/files/SysinternalsSuite.zip -outfile SysinternalsSuite.zip
+
 
 "C:\ProgramData\chocolatey\bin\Bginfo64.exe" "C:\ProgramData\chocolatey\bin\win2016_bginfo.bgi" /timer:0
 
